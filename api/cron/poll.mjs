@@ -3,6 +3,7 @@
  * Nécessite : HELIUS_API_KEY, NTFY_TOPIC, WATCH_WALLETS (JSON)
  * Déduplication : Vercel KV si configuré, sinon fenêtre ~90 s (risque de doublon rare).
  */
+import { axiomTradeUrl } from '../lib/axiom.mjs';
 import { postNtfy, ntfyHeaderAscii } from '../lib/ntfy.mjs';
 import { heliusRpcUrl, rpc, fetchRecentSignatures, extractPumpBuyFromTx } from '../lib/solana.mjs';
 
@@ -93,15 +94,11 @@ export default async function handler(request) {
           continue;
         }
 
-        const body = [
-          `>>> ${label} — achat Pump`,
-          `SOL: ${hit.sol.toFixed(3)}`,
-          hit.mint,
-        ].join('\n');
-        const click = `https://pump.fun/${hit.mint}`;
-        const res = await postNtfy(topic, body, {
-          title: ntfyHeaderAscii(`${label} | nouveau mint`),
+        const click = await axiomTradeUrl(hit.mint);
+        const res = await postNtfy(topic, 'Nouveau rug', {
+          title: ntfyHeaderAscii('Nouveau rug'),
           click,
+          tags: 'warning',
         });
         if (res.ok) {
           notified++;

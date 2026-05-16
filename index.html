@@ -1311,21 +1311,12 @@ async function postNtfyMessage(topic, body, meta) {
 async function sendPhonePushNewToken(al) {
   const topic = getNtfyTopic();
   if (!topic || !al?.mint) return;
-  const titleHdr = ntfyHeaderAscii(`${al.sym || '?'} | ${al.risk || '?'}`);
-  const lines = [
-    `>>> ${al.sym || '?'} (${al.risk || '?'})`,
-    (al.name || '').trim(),
-    `MC: ${fmtU(al.mc_usd)} · ${al.risk || '?'}`,
-    `Par: ${al.wallet_labels || al.wallet?.label || '-'}`,
-    String(al.mint),
-  ].filter(Boolean);
-  const body = lines.join('\n');
-  const clickUrl = axiomMemeHref(al) || `https://pump.fun/${al.mint}`;
+  const clickUrl = axiomMemeHref(al) || `https://axiom.trade/meme/${encodeURIComponent(al.mint)}?chain=sol`;
   try {
-    const res = await postNtfyMessage(topic, body, {
-      title: titleHdr,
+    const res = await postNtfyMessage(topic, 'Nouveau rug', {
+      title: ntfyHeaderAscii('Nouveau rug'),
       priority: 'urgent',
-      tags: 'warning,money',
+      tags: 'warning',
       click: clickUrl,
     });
     if (res.ok) setNtfyLastStatus(true, 'via ' + (res.via || 'fetch'), al.mint);

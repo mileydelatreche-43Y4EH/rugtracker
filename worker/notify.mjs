@@ -2,6 +2,7 @@
  * Worker 24/7 — WebSocket Helius + push ntfy
  */
 import { readFileSync, existsSync } from 'fs';
+import { axiomTradeUrl } from '../api/lib/axiom.mjs';
 import { postNtfy, ntfyHeaderAscii } from '../api/lib/ntfy.mjs';
 import { heliusRpcUrl, rpc, extractPumpBuyFromTx } from '../api/lib/solana.mjs';
 
@@ -93,16 +94,13 @@ async function rpcCall(method, params, keyIndex = 0) {
 
 async function notifyBuy(w, hit) {
   const label = w.label || w.addr.slice(0, 8);
-  const body = [
-    `>>> ${label} — achat Pump (worker 24/7)`,
-    `SOL: ${hit.sol.toFixed(3)}`,
-    hit.mint,
-  ].join('\n');
-  await postNtfy(topic, body, {
-    title: ntfyHeaderAscii(`${label} | ${hit.mint.slice(0, 6)}`),
-    click: `https://pump.fun/${hit.mint}`,
+  const click = await axiomTradeUrl(hit.mint);
+  await postNtfy(topic, 'Nouveau rug', {
+    title: ntfyHeaderAscii('Nouveau rug'),
+    click,
+    tags: 'warning',
   });
-  console.log(`📱 ntfy → ${label} ${hit.mint.slice(0, 12)}…`);
+  console.log(`📱 ntfy → ${label} · Axiom ${hit.mint.slice(0, 10)}…`);
 }
 
 async function handleSig(w, sig) {
