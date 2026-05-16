@@ -32,8 +32,16 @@ function loadEnvFile() {
 
 loadEnvFile();
 
-const apiKey = process.env.HELIUS_API_KEY;
+let apiKey = (process.env.HELIUS_API_KEY || '').trim();
+if (apiKey.includes('api-key=')) apiKey = apiKey.split('api-key=').pop().split('&')[0].trim();
+if (apiKey.includes('helius-rpc.com')) {
+  console.error('HELIUS_API_KEY doit être la clé seule (ex. 927dcc53-...), pas l’URL complète.');
+  process.exit(1);
+}
 const topic = (process.env.NTFY_TOPIC || '').trim();
+if (topic.includes('ton_topic') || topic.length < 6) {
+  console.warn('⚠ NTFY_TOPIC ressemble à un placeholder — mets le vrai topic de l’app ntfy.');
+}
 let wallets = [];
 try {
   wallets = JSON.parse(process.env.WATCH_WALLETS || '[]');
@@ -94,13 +102,15 @@ async function handleSig(w, sig, blockTime) {
 }
 
 function startWalletWs(w) {
-  const box = { w, stopped: false, ws: null };
+  const box = { w, stopped: false, ws: null, reconnectTimer: null };
 
   function connect() {
     if (box.stopped) return;
+    if (box.ws && (box.ws.readyState === WebSocket.OPEN || box.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
     const ws = new WebSocket(wsUrl);
     box.ws = ws;
-    let subId;
 
     ws.onopen = () => {
       ws.send(JSON.stringify({
@@ -116,7 +126,6 @@ function startWalletWs(w) {
       try {
         const d = JSON.parse(ev.data);
         if (d.result !== undefined && d.id === 1) {
-          subId = d.result;
           return;
         }
         const val = d?.params?.result?.value;
@@ -129,12 +138,19 @@ function startWalletWs(w) {
     };
 
     ws.onclose = () => {
+      box.ws = null;
       if (box.stopped) return;
+      if (box.reconnectTimer) return;
       console.log(`🔌 WS ${w.label} — reconnexion 3s`);
-      setTimeout(connect, 3000);
+      box.reconnectTimer = setTimeout(() => {
+        box.reconnectTimer = null;
+        connect();
+      }, 3000);
     };
 
-    ws.onerror = () => ws.close();
+    ws.onerror = () => {
+      console.warn(`⚠ WS ${w.label} — erreur connexion (Helius / réseau)`);
+    };
   }
 
   connect();
@@ -156,9 +172,13 @@ async function warmStart() {
         const hit = extractPumpBuyFromTx(tx, w.addr);
         if (hit) seenMints.add(hit.mint);
       }
-    } catch (e) {
-      console.warn('warmStart', w.label, e.message);
+  } catch (e) {
+    const msg = e.message || String(e);
+    console.warn('warmStart', w.label, msg);
+    if (msg.includes('401')) {
+      console.error('❌ Helius 401 = clé invalide ou expirée. Vérifie HELIUS_API_KEY sur Railway (clé seule, sans espaces).');
     }
+  }
     await sleep(400);
   }
   console.log(`Warm-start : ${seenMints.size} mint(s) récents ignorés`);
