@@ -68,6 +68,9 @@ function wsUrlForKey(key) {
 const seenSigs = new Set();
 const seenMints = new Set();
 const isRailway = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID);
+const singleKey = HELIUS_KEYS.length === 1;
+/** 1 clé + 4 wallets = trop de WS/poll en parallèle → 429. */
+const railwayPollOnly = isRailway && singleKey && process.env.RAILWAY_WS_MODE !== '1';
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
@@ -190,10 +193,10 @@ async function warmStartLight() {
   for (let i = 0; i < wallets.length; i++) {
     const w = wallets[i];
     try {
-      const sigs = await rpcCall('getSignaturesForAddress', [w.addr, { limit: 15 }], i);
+      const sigs = await rpcCall('getSignaturesForAddress', [w.addr, { limit: isRailway ? 8 : 15 }], i);
       for (const s of sigs || []) {
         if (s.signature) seenSigs.add(s.signature);
-        if ((s.blockTime || 0) >= cutoff) {
+        if (!isRailway && (s.blockTime || 0) >= cutoff) {
           const tx = await rpcCall('getTransaction', [
             s.signature,
             { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 },
@@ -206,29 +209,35 @@ async function warmStartLight() {
     } catch (e) {
       console.warn('warmStart', w.label, e.message || e);
     }
-    await sleep(1200);
+    await sleep(isRailway ? 2000 : 1200);
   }
-  console.log(`Warm-start : ${seenMints.size} mint(s) en mémoire`);
+  console.log(`Warm-start : ${seenSigs.size} sig(s) · ${seenMints.size} mint(s) en mémoire`);
 }
 
 async function pollLoop() {
-  const interval = Number(process.env.POLL_INTERVAL_SEC || 12) * 1000;
-  console.log(`📡 Mode secours : poll toutes les ${interval / 1000}s`);
+  const defaultSec = railwayPollOnly ? 20 : 12;
+  const interval = Number(process.env.POLL_INTERVAL_SEC || defaultSec) * 1000;
+  console.log(
+    railwayPollOnly
+      ? `📡 Mode poll seul (1 clé) — cycle ~${interval / 1000}s entre les 4 wallets`
+      : `📡 Mode secours : poll toutes les ${interval / 1000}s`,
+  );
   while (true) {
     for (let i = 0; i < wallets.length; i++) {
       const w = wallets[i];
       if (!w.addr) continue;
       try {
-        const sigs = await rpcCall('getSignaturesForAddress', [w.addr, { limit: 8 }], i);
+        const sigs = await rpcCall('getSignaturesForAddress', [w.addr, { limit: 6 }], i);
         for (const s of sigs || []) {
           if (!s.signature || seenSigs.has(s.signature)) continue;
           await handleSig(w, s.signature);
-          await sleep(300);
+          await sleep(railwayPollOnly ? 600 : 300);
         }
       } catch (e) {
         console.warn('poll', w.label, e.message || e);
+        await sleep(3000);
       }
-      await sleep(800);
+      await sleep(railwayPollOnly ? 2500 : 800);
     }
     await sleep(interval);
   }
@@ -236,15 +245,34 @@ async function pollLoop() {
 
 console.log(`Bundle Tracker worker — ${wallets.length} wallet(s) · ${HELIUS_KEYS.length} clé(s) Helius · ntfy:${topic}`);
 
-console.log(isRailway ? 'Mode Railway : warm-start léger + poll de secours' : 'Démarrage…');
-await warmStartLight();
-
-for (let i = 0; i < wallets.length; i++) {
-  if (wallets[i].addr) startWalletWs(wallets[i], i);
-  await sleep(2500);
+if (isRailway) {
+  console.log(
+    railwayPollOnly
+      ? 'Mode Railway : 1 clé → poll uniquement (ajoute HELIUS_API_KEYS pour activer les WS)'
+      : `Mode Railway : ${HELIUS_KEYS.length} clé(s) → WebSocket + poll léger`,
+  );
+} else {
+  console.log('Démarrage…');
 }
 
-if (process.env.ENABLE_POLL_FALLBACK === '1' || isRailway) {
+if (process.env.SKIP_WARM_START !== '1' && !(isRailway && railwayPollOnly)) {
+  await warmStartLight();
+} else if (isRailway) {
+  console.log('Warm-start ignoré (évite 429 au démarrage)');
+}
+
+if (!railwayPollOnly) {
+  for (let i = 0; i < wallets.length; i++) {
+    if (wallets[i].addr) startWalletWs(wallets[i], i);
+    await sleep(2500);
+  }
+}
+
+const wantPoll =
+  railwayPollOnly ||
+  process.env.ENABLE_POLL_FALLBACK === '1' ||
+  (isRailway && singleKey);
+if (wantPoll) {
   void pollLoop();
 }
 
