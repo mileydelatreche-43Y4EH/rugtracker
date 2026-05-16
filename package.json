@@ -8,9 +8,6 @@
     "preview": "vite preview",
     "worker": "node worker/notify.mjs"
   },
-  "optionalDependencies": {
-    "@vercel/kv": "^3.0.0"
-  },
   "devDependencies": {
     "vite": "^6.3.5"
   }

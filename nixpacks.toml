@@ -1,0 +1,9 @@
+# Railway : worker 24/7 uniquement (pas de build Vite)
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+
+[phases.install]
+cmds = ["npm install --omit=dev"]
+
+[start]
+cmd = "node worker/notify.mjs"
