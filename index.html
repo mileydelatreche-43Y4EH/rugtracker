@@ -1323,12 +1323,17 @@ async function postNtfyMessage(topic, body, meta) {
 async function sendPhonePushNewToken(al) {
   const topic = getNtfyTopic();
   if (!topic || !al?.mint) return;
+  const w = al.wallet || {};
+  const sym = al.sym || al.mint.slice(0, 6).toUpperCase();
+  const label = w.label || al.wallet_labels || '-';
+  const title = `🎯 ${sym} — nouveau token`;
+  const body = `${label}\nMC ${fmtU(al.mc_usd)} · ${al.risk || '?'}`;
   const clickUrl = axiomMemeHref(al) || `https://axiom.trade/meme/${encodeURIComponent(al.mint)}?chain=sol`;
   try {
-    const res = await postNtfyMessage(topic, 'Nouveau rug', {
-      title: ntfyHeaderAscii('Nouveau rug'),
-      priority: 'urgent',
-      tags: 'warning',
+    const res = await postNtfyMessage(topic, body, {
+      title: ntfyHeaderAscii(title),
+      priority: 'max',
+      tags: 'warning,money',
       click: clickUrl,
     });
     if (res.ok) setNtfyLastStatus(true, 'via ' + (res.via || 'fetch'), al.mint);
