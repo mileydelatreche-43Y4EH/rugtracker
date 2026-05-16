@@ -1,8 +1,0 @@
-# Install : nixpacks.toml — démarrage : startCommand ci-dessous uniquement
-[build]
-builder = "nixpacks"
-
-[deploy]
-startCommand = "node worker/notify.mjs"
-restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 10

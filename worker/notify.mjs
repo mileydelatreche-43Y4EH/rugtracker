@@ -1,11 +1,5 @@
 /**
- * Worker 24/7 — WebSocket Helius + push ntfy (comme le navigateur, mais toujours allumé).
- *
- * Usage local :
- *   cp .env.example .env   # remplir HELIUS_API_KEY, NTFY_TOPIC, WATCH_WALLETS
- *   node worker/notify.mjs
- *
- * Hébergement : Railway, Render, Fly.io, VPS (pas Vercel — pas de WS longue durée).
+ * Worker 24/7 — WebSocket Helius + push ntfy
  */
 import { readFileSync, existsSync } from 'fs';
 import { postNtfy, ntfyHeaderAscii } from '../api/lib/ntfy.mjs';
@@ -30,18 +24,23 @@ function loadEnvFile() {
   }
 }
 
+function parseHeliusKeys() {
+  const raw = process.env.HELIUS_API_KEYS || process.env.HELIUS_API_KEY || '';
+  const keys = String(raw)
+    .split(/[,;\s]+/)
+    .map(s => {
+      let k = s.trim();
+      if (k.includes('api-key=')) k = k.split('api-key=').pop().split('&')[0].trim();
+      return k;
+    })
+    .filter(k => k.length > 10 && !k.includes('helius-rpc.com'));
+  return [...new Set(keys)];
+}
+
 loadEnvFile();
 
-let apiKey = (process.env.HELIUS_API_KEY || '').trim();
-if (apiKey.includes('api-key=')) apiKey = apiKey.split('api-key=').pop().split('&')[0].trim();
-if (apiKey.includes('helius-rpc.com')) {
-  console.error('HELIUS_API_KEY doit être la clé seule (ex. 927dcc53-...), pas l’URL complète.');
-  process.exit(1);
-}
+const HELIUS_KEYS = parseHeliusKeys();
 const topic = (process.env.NTFY_TOPIC || '').trim();
-if (topic.includes('ton_topic') || topic.length < 6) {
-  console.warn('⚠ NTFY_TOPIC ressemble à un placeholder — mets le vrai topic de l’app ntfy.');
-}
 let wallets = [];
 try {
   wallets = JSON.parse(process.env.WATCH_WALLETS || '[]');
@@ -50,21 +49,46 @@ try {
   process.exit(1);
 }
 
-if (!apiKey || !topic || !wallets.length) {
-  console.error('Requis : HELIUS_API_KEY, NTFY_TOPIC, WATCH_WALLETS dans .env');
+if (!HELIUS_KEYS.length || !topic || !wallets.length) {
+  console.error('Requis : HELIUS_API_KEY (ou HELIUS_API_KEYS), NTFY_TOPIC, WATCH_WALLETS');
   process.exit(1);
 }
 
-const rpcUrl = heliusRpcUrl(apiKey);
-const wsUrl = `wss://mainnet.helius-rpc.com/?api-key=${apiKey}`;
+let rpcRound = 0;
+function pickKey(i = 0) {
+  return HELIUS_KEYS[(i + rpcRound) % HELIUS_KEYS.length];
+}
+function rpcUrlForKey(key) {
+  return heliusRpcUrl(key);
+}
+function wsUrlForKey(key) {
+  return `wss://mainnet.helius-rpc.com/?api-key=${key}`;
+}
+
 const seenSigs = new Set();
 const seenMints = new Set();
+const isRailway = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID);
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
 
-async function notifyBuy(w, hit, sig) {
+async function rpcCall(method, params, keyIndex = 0) {
+  const key = pickKey(keyIndex);
+  rpcRound++;
+  try {
+    return await rpc(rpcUrlForKey(key), method, params);
+  } catch (e) {
+    const msg = e.message || String(e);
+    if (msg.includes('429') && HELIUS_KEYS.length > 1) {
+      await sleep(800);
+      return rpc(rpcUrlForKey(pickKey(keyIndex + 1)), method, params);
+    }
+    throw e;
+  }
+}
+
+async function notifyBuy(w, hit) {
   const label = w.label || w.addr.slice(0, 8);
   const body = [
     `>>> ${label} — achat Pump (worker 24/7)`,
@@ -78,7 +102,7 @@ async function notifyBuy(w, hit, sig) {
   console.log(`📱 ntfy → ${label} ${hit.mint.slice(0, 12)}…`);
 }
 
-async function handleSig(w, sig, blockTime) {
+async function handleSig(w, sig) {
   if (!sig || seenSigs.has(sig)) return;
   seenSigs.add(sig);
   if (seenSigs.size > 8000) {
@@ -87,7 +111,7 @@ async function handleSig(w, sig, blockTime) {
     a.slice(-4000).forEach(s => seenSigs.add(s));
   }
   try {
-    const tx = await rpc(rpcUrl, 'getTransaction', [
+    const tx = await rpcCall('getTransaction', [
       sig,
       { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 },
     ]);
@@ -95,14 +119,16 @@ async function handleSig(w, sig, blockTime) {
     if (!hit) return;
     if (seenMints.has(hit.mint)) return;
     seenMints.add(hit.mint);
-    await notifyBuy(w, hit, sig);
+    await notifyBuy(w, hit);
   } catch (e) {
     console.warn('handleSig', w.label, e.message || e);
   }
 }
 
-function startWalletWs(w) {
-  const box = { w, stopped: false, ws: null, reconnectTimer: null };
+function startWalletWs(w, walletIndex) {
+  const key = pickKey(walletIndex);
+  const wsUrl = wsUrlForKey(key);
+  const box = { w, stopped: false, ws: null, reconnectTimer: null, backoffMs: 5000 };
 
   function connect() {
     if (box.stopped) return;
@@ -113,27 +139,26 @@ function startWalletWs(w) {
     box.ws = ws;
 
     ws.onopen = () => {
+      box.backoffMs = 5000;
       ws.send(JSON.stringify({
         jsonrpc: '2.0',
         id: 1,
         method: 'logsSubscribe',
         params: [{ mentions: [w.addr] }, { commitment: 'confirmed' }],
       }));
-      console.log(`✅ WS ${w.label}`);
+      console.log(`✅ WS ${w.label} (clé #${(walletIndex % HELIUS_KEYS.length) + 1})`);
     };
 
     ws.onmessage = (ev) => {
       try {
         const d = JSON.parse(ev.data);
-        if (d.result !== undefined && d.id === 1) {
-          return;
-        }
+        if (d.result !== undefined && d.id === 1) return;
         const val = d?.params?.result?.value;
         if (!val) return;
         const logs = (val.logs || []).join(' ');
         const sig = val.signature || '';
         if (!logs.includes(PUMP) || !logs.includes('Instruction: Buy')) return;
-        void handleSig(w, sig, Math.floor(Date.now() / 1000));
+        void handleSig(w, sig);
       } catch {}
     };
 
@@ -141,15 +166,17 @@ function startWalletWs(w) {
       box.ws = null;
       if (box.stopped) return;
       if (box.reconnectTimer) return;
-      console.log(`🔌 WS ${w.label} — reconnexion 3s`);
+      const wait = box.backoffMs;
+      console.log(`🔌 WS ${w.label} — reconnexion dans ${wait / 1000}s`);
       box.reconnectTimer = setTimeout(() => {
         box.reconnectTimer = null;
+        box.backoffMs = Math.min(box.backoffMs * 1.5, 60000);
         connect();
-      }, 3000);
+      }, wait);
     };
 
     ws.onerror = () => {
-      console.warn(`⚠ WS ${w.label} — erreur connexion (Helius / réseau)`);
+      console.warn(`⚠ WS ${w.label} — erreur (souvent limite Helius / trop de connexions)`);
     };
   }
 
@@ -157,38 +184,68 @@ function startWalletWs(w) {
   return box;
 }
 
-async function warmStart() {
-  const cutoff = Math.floor(Date.now() / 1000) - 7200;
-  for (const w of wallets) {
+/** Léger : seulement les signatures récentes, pas 40× getTransaction (évite 429). */
+async function warmStartLight() {
+  const cutoff = Math.floor(Date.now() / 1000) - 3600;
+  for (let i = 0; i < wallets.length; i++) {
+    const w = wallets[i];
     try {
-      const sigs = await rpc(rpcUrl, 'getSignaturesForAddress', [w.addr, { limit: 40 }]);
+      const sigs = await rpcCall('getSignaturesForAddress', [w.addr, { limit: 15 }], i);
       for (const s of sigs || []) {
-        if ((s.blockTime || 0) < cutoff) continue;
-        seenSigs.add(s.signature);
-        const tx = await rpc(rpcUrl, 'getTransaction', [
-          s.signature,
-          { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 },
-        ]);
-        const hit = extractPumpBuyFromTx(tx, w.addr);
-        if (hit) seenMints.add(hit.mint);
+        if (s.signature) seenSigs.add(s.signature);
+        if ((s.blockTime || 0) >= cutoff) {
+          const tx = await rpcCall('getTransaction', [
+            s.signature,
+            { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 },
+          ], i);
+          const hit = extractPumpBuyFromTx(tx, w.addr);
+          if (hit) seenMints.add(hit.mint);
+          await sleep(350);
+        }
       }
-  } catch (e) {
-    const msg = e.message || String(e);
-    console.warn('warmStart', w.label, msg);
-    if (msg.includes('401')) {
-      console.error('❌ Helius 401 = clé invalide ou expirée. Vérifie HELIUS_API_KEY sur Railway (clé seule, sans espaces).');
+    } catch (e) {
+      console.warn('warmStart', w.label, e.message || e);
     }
+    await sleep(1200);
   }
-    await sleep(400);
-  }
-  console.log(`Warm-start : ${seenMints.size} mint(s) récents ignorés`);
+  console.log(`Warm-start : ${seenMints.size} mint(s) en mémoire`);
 }
 
-console.log(`Bundle Tracker worker — ${wallets.length} wallet(s) → ntfy:${topic.slice(0, 12)}…`);
-await warmStart();
-for (const w of wallets) {
-  if (w.addr) startWalletWs(w);
+async function pollLoop() {
+  const interval = Number(process.env.POLL_INTERVAL_SEC || 12) * 1000;
+  console.log(`📡 Mode secours : poll toutes les ${interval / 1000}s`);
+  while (true) {
+    for (let i = 0; i < wallets.length; i++) {
+      const w = wallets[i];
+      if (!w.addr) continue;
+      try {
+        const sigs = await rpcCall('getSignaturesForAddress', [w.addr, { limit: 8 }], i);
+        for (const s of sigs || []) {
+          if (!s.signature || seenSigs.has(s.signature)) continue;
+          await handleSig(w, s.signature);
+          await sleep(300);
+        }
+      } catch (e) {
+        console.warn('poll', w.label, e.message || e);
+      }
+      await sleep(800);
+    }
+    await sleep(interval);
+  }
 }
 
-// Keep-alive ping
+console.log(`Bundle Tracker worker — ${wallets.length} wallet(s) · ${HELIUS_KEYS.length} clé(s) Helius · ntfy:${topic}`);
+
+console.log(isRailway ? 'Mode Railway : warm-start léger + poll de secours' : 'Démarrage…');
+await warmStartLight();
+
+for (let i = 0; i < wallets.length; i++) {
+  if (wallets[i].addr) startWalletWs(wallets[i], i);
+  await sleep(2500);
+}
+
+if (process.env.ENABLE_POLL_FALLBACK === '1' || isRailway) {
+  void pollLoop();
+}
+
 setInterval(() => {}, 60000);
