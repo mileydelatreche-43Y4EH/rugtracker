@@ -84,6 +84,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 .pref-check{display:flex;align-items:flex-start;gap:8px;cursor:pointer;line-height:1.5}
 .pref-check input{accent-color:var(--purple);margin-top:2px;flex-shrink:0}
 .pref-hint{font-size:11px;color:var(--text3);margin-top:8px;line-height:1.55}
+.settings-wrap{display:flex;flex-direction:column;gap:14px;max-width:540px}
+.settings-card{border:1px solid var(--border);border-radius:12px;background:var(--bg2);padding:16px 18px}
+.settings-card .settings-title{font-size:14px;font-weight:600;color:var(--text);margin:0 0 4px;display:flex;align-items:center;gap:8px}
+.settings-card .settings-desc{font-size:12px;color:var(--text2);line-height:1.6;margin:0 0 12px}
+.settings-status{font-size:11px;color:var(--text3);line-height:1.5;margin-top:10px;min-height:16px}
+.settings-status.ok{color:var(--green)}
+.settings-status.warn{color:var(--orange)}
+.settings-actions{display:flex;flex-wrap:wrap;gap:8px}
 .ps-feed{display:flex;flex-direction:column;gap:6px;margin-top:10px}
 .ps-row{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;font-size:11px;animation:slideIn .35s}
 .ps-row .ps-mint{flex:1;font-family:'Space Mono',monospace;font-size:10px;word-break:break-all;color:var(--green)}
@@ -360,25 +368,41 @@ select{font-family:'DM Sans',sans-serif;font-size:12px}
 </div>
 
 <!-- PARAMÈTRES -->
-<div id="page-settings" class="page">
-  <div class="card" style="max-width:520px">
-    <div class="ch"><div class="ct">💾 Sauvegarde</div></div>
-    <p class="pref-hint" style="margin-top:0">Groupes + réglages : <strong>localhost</strong> et <strong>vercel.app</strong> ne partagent pas les mêmes données.</p>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
-      <button type="button" class="btn-sm btn-sec" onclick="exportSiteBackup()">⎘ Exporter (.json)</button>
+<div id="page-settings" class="page settings-wrap">
+
+  <div class="settings-card">
+    <p class="settings-title">☁ Sauvegarde cloud</p>
+    <p class="settings-desc">Un <strong>code secret</strong> identique sur PC, Vercel et téléphone → groupes + réglages synchronisés automatiquement.</p>
+    <div class="pref-simple-row">
+      <label for="cloud-sync-pass">Code secret (8+ caractères)</label>
+      <input type="password" id="cloud-sync-pass" autocomplete="off" placeholder="ex: mon_code_perso_2026" style="max-width:100%"/>
+    </div>
+    <label class="pref-check" style="margin:10px 0"><input type="checkbox" id="cloud-sync-auto" checked/> Sauvegarde auto à chaque changement</label>
+    <div class="settings-actions">
+      <button type="button" class="btn-sm" onclick="activateCloudSync()">Activer le cloud</button>
+      <button type="button" class="btn-sm btn-sec" onclick="pullCloudBackupNow()">⬇ Récupérer</button>
+    </div>
+    <div id="cloud-sync-status" class="settings-status"></div>
+  </div>
+
+  <div class="settings-card">
+    <p class="settings-title">💾 Fichier .json</p>
+    <p class="settings-desc">Export / import manuel (secours).</p>
+    <div class="settings-actions">
+      <button type="button" class="btn-sm btn-sec" onclick="exportSiteBackup()">⎘ Exporter</button>
       <label class="btn-sm btn-sec" style="cursor:pointer;margin:0;display:inline-flex;align-items:center">
         📥 Importer
         <input type="file" accept="application/json,.json" style="display:none" onchange="importSiteBackupFromInput(event)"/>
       </label>
     </div>
-    <div id="backup-hint" style="font-size:11px;color:var(--text3);line-height:1.55;min-height:16px;margin-top:8px"></div>
+    <div id="backup-hint" class="settings-status"></div>
   </div>
 
-  <div class="card" style="max-width:520px;margin-top:14px">
-    <div class="ch"><div class="ct">🔊 Sons & alertes (PC)</div></div>
+  <div class="settings-card">
+    <p class="settings-title">🔊 Sons & alertes</p>
     <div class="pref-simple">
       <div class="pref-simple-row">
-        <label for="pref-alert-sound">Bruit à l'achat détecté</label>
+        <label for="pref-alert-sound">Bruit à l'achat</label>
         <select id="pref-alert-sound" onchange="saveSitePrefsFromForm()">
           <option value="off">Silencieux</option>
           <option value="classic">Classique (selon risque)</option>
@@ -386,12 +410,12 @@ select{font-family:'DM Sans',sans-serif;font-size:12px}
           <option value="urgent">Urgent</option>
           <option value="coin">Coin</option>
         </select>
-        <button type="button" class="btn-sm btn-sec" style="align-self:flex-start;margin-top:4px" onclick="previewAlertSound()">▶ Tester le son</button>
+        <button type="button" class="btn-sm btn-sec" style="align-self:flex-start;margin-top:4px" onclick="previewAlertSound()">▶ Tester</button>
       </div>
-      <label class="pref-check"><input type="checkbox" id="pref-desk-snd" onchange="saveSitePrefsFromForm()"/> Son Windows sur notif bureau</label>
-      <label class="pref-check"><input type="checkbox" id="pref-title-pulse" onchange="saveSitePrefsFromForm()"/> Titre d'onglet qui clignote</label>
+      <label class="pref-check"><input type="checkbox" id="pref-desk-snd" onchange="saveSitePrefsFromForm()"/> Son Windows (notif bureau)</label>
+      <label class="pref-check"><input type="checkbox" id="pref-title-pulse" onchange="saveSitePrefsFromForm()"/> Titre d'onglet clignotant</label>
       <div class="pref-simple-row">
-        <label for="pref-desk-risk">Notifs bureau — niveau minimum</label>
+        <label for="pref-desk-risk">Notifs bureau — minimum</label>
         <select id="pref-desk-risk" onchange="saveSitePrefsFromForm()">
           <option value="OFF">Désactivées</option>
           <option value="LOW">LOW et +</option>
@@ -400,44 +424,43 @@ select{font-family:'DM Sans',sans-serif;font-size:12px}
           <option value="DANGER">DANGER seulement</option>
         </select>
       </div>
-      <label class="pref-check"><input type="checkbox" id="pref-compact-ov" onchange="saveSitePrefsFromForm()"/> Cartes Dex plus compactes</label>
+      <label class="pref-check"><input type="checkbox" id="pref-compact-ov" onchange="saveSitePrefsFromForm()"/> Cartes Dex compactes</label>
     </div>
-    <span id="pref-save-hint" style="font-size:11px;color:var(--text3);display:block;margin-top:10px"></span>
+    <span id="pref-save-hint" class="settings-status"></span>
   </div>
 
-  <div class="card" style="max-width:520px;margin-top:14px">
-    <div class="ch"><div class="ct">📱 Téléphone (ntfy)</div></div>
-    <p class="pref-hint" style="margin-top:0">App <a href="https://ntfy.sh" target="_blank" rel="noopener" style="color:var(--purple2)">ntfy</a> — même topic. 24/7 sans PC → Railway.</p>
-    <div class="irow" style="align-items:center;margin-top:10px">
+  <div class="settings-card">
+    <p class="settings-title">📱 Téléphone (ntfy)</p>
+    <p class="settings-desc">App <a href="https://ntfy.sh" target="_blank" rel="noopener" style="color:var(--purple2)">ntfy</a> — même topic. 24/7 → Railway.</p>
+    <div class="irow" style="align-items:center;margin-top:8px">
       <input type="text" id="ntfy-topic" autocomplete="off" spellcheck="false" placeholder="ton_topic_secret" style="flex:1;min-width:0;font-size:12px;padding:8px 10px;border-radius:7px"/>
-      <button type="button" class="btn-sm btn-sec" onclick="saveNtfyTopic()" style="flex-shrink:0">OK</button>
-      <button type="button" class="btn-sm btn-sec" onclick="testNtfyPush()" style="flex-shrink:0">🧪 Test</button>
+      <button type="button" class="btn-sm btn-sec" onclick="saveNtfyTopic()">OK</button>
+      <button type="button" class="btn-sm btn-sec" onclick="testNtfyPush()">🧪</button>
     </div>
     <div id="ntfy-hint" style="font-size:11px;color:var(--green);margin-top:8px;min-height:16px;display:none"></div>
-    <div id="ntfy-status-line" style="font-size:11px;color:var(--text3);margin-top:6px;line-height:1.55"></div>
+    <div id="ntfy-status-line" class="settings-status"></div>
   </div>
 
-  <div class="card" style="max-width:520px;margin-top:14px">
-    <div class="ch"><div class="ct">🔔 PC — notifications Windows</div></div>
-    <p class="pref-hint" style="margin-top:0">Onglet ouvert. Fermeture auto après 5 s.</p>
-    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px">
-      <button type="button" class="btn-sm" onclick="requestDesktopNotify()">Autoriser Chrome / Edge</button>
+  <div class="settings-card">
+    <p class="settings-title">🔔 Notifications PC</p>
+    <p class="settings-desc">Onglet ouvert — fermeture auto 5 s.</p>
+    <div class="settings-actions" style="margin-top:8px">
+      <button type="button" class="btn-sm" onclick="requestDesktopNotify()">Autoriser Chrome</button>
       <span id="desk-notify-status" style="font-size:12px;color:var(--text2)"></span>
     </div>
-    <label class="pref-check" style="margin-top:12px"><input type="checkbox" id="pref-desk-ide-embed" onchange="saveSitePrefsFromForm()"/> Aussi depuis Cursor / VS Code (peut doubler)</label>
+    <label class="pref-check" style="margin-top:10px"><input type="checkbox" id="pref-desk-ide-embed" onchange="saveSitePrefsFromForm()"/> Aussi depuis Cursor (peut doubler)</label>
   </div>
 
-  <div class="card" style="max-width:520px;margin-top:14px">
-    <div class="ch"><div class="ct">☁ 24/7 sans PC (Railway)</div></div>
-    <p class="pref-hint" style="margin-top:0">Copie pour ton worker Railway.</p>
-    <button type="button" class="btn-sm btn-sec" onclick="copyCloudNotifyConfig()" style="margin-top:10px">⎘ Copier config Railway</button>
-    <pre id="cloud-config-preview" style="font-size:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;max-height:100px;color:var(--text2);margin:10px 0 0"></pre>
+  <div class="settings-card">
+    <p class="settings-title">☁ Railway 24/7</p>
+    <p class="settings-desc">Config worker (notifs sans PC).</p>
+    <button type="button" class="btn-sm btn-sec" onclick="copyCloudNotifyConfig()" style="margin-top:8px">⎘ Copier config</button>
+    <pre id="cloud-config-preview" style="font-size:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;max-height:90px;color:var(--text2);margin:10px 0 0"></pre>
   </div>
 
-  <div style="max-width:520px;margin-top:12px">
-    <button type="button" class="btn-sm btn-sec" onclick="resetSitePrefsToDefaults()">Réinitialiser tous les réglages</button>
-  </div>
+  <button type="button" class="btn-sm btn-sec" onclick="resetSitePrefsToDefaults()">Réinitialiser les réglages</button>
 </div>
+
 
 
 </div></div></div>
@@ -599,7 +622,138 @@ const fmtU    = n  => { if(!n||n<=0)return '—'; if(n>=1e6)return '$'+(n/1e6).t
 const fmtS    = n  => n>0 ? n.toFixed(3)+' SOL' : '—';
 const escHtml = s  => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 const show    = (id,v) => { const e=document.getElementById(id); if(e) e.style.display=v?'block':'none'; };
-const saveG   = () => localStorage.setItem('bt_groups', JSON.stringify(groups));
+const LS_SYNC_HASH = 'bt_cloud_sync_hash';
+const LS_SYNC_AUTO = 'bt_cloud_sync_auto';
+const LS_BACKUP_AT = 'bt_backup_at';
+let cloudBackupTimer = null;
+let applyingCloudBackup = false;
+
+function saveG() {
+  localStorage.setItem('bt_groups', JSON.stringify(groups));
+  touchLocalBackupMeta();
+  scheduleCloudBackup();
+}
+function touchLocalBackupMeta() {
+  try { localStorage.setItem(LS_BACKUP_AT, new Date().toISOString()); } catch (e) {}
+}
+function isCloudAutoOn() {
+  const el = document.getElementById('cloud-sync-auto');
+  if (el) return el.checked;
+  return localStorage.getItem(LS_SYNC_AUTO) !== '0';
+}
+function setCloudSyncStatus(msg, ok) {
+  const el = document.getElementById('cloud-sync-status');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.className = 'settings-status' + (ok === true ? ' ok' : ok === false ? ' warn' : '');
+}
+async function sha256hex(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(str || '').trim()));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function scheduleCloudBackup() {
+  if (applyingCloudBackup || !isCloudAutoOn()) return;
+  if (!localStorage.getItem(LS_SYNC_HASH)) return;
+  if (cloudBackupTimer) clearTimeout(cloudBackupTimer);
+  cloudBackupTimer = setTimeout(() => { void pushCloudBackup(false); }, 1200);
+}
+async function pushCloudBackup(manual) {
+  const hash = localStorage.getItem(LS_SYNC_HASH);
+  if (!hash) {
+    if (manual) setCloudSyncStatus('Définis un code secret puis « Activer le cloud ».', false);
+    return;
+  }
+  const payload = buildSiteBackupPayload();
+  try {
+    setCloudSyncStatus('Envoi cloud…', null);
+    const r = await fetch('/api/cloud-sync?key=' + encodeURIComponent(hash), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const j = await r.json();
+    if (!j.ok) {
+      setCloudSyncStatus(j.error || 'Échec cloud (Vercel KV ?)', false);
+      return;
+    }
+    touchLocalBackupMeta();
+    setCloudSyncStatus('☁ Sauvegardé · ' + groups.length + ' groupe(s) · ' + new Date().toLocaleTimeString('fr-FR'), true);
+  } catch (e) {
+    setCloudSyncStatus('Réseau : ' + (e.message || e), false);
+  }
+}
+async function pullCloudBackupNow() {
+  const hash = localStorage.getItem(LS_SYNC_HASH);
+  const passEl = document.getElementById('cloud-sync-pass');
+  const pass = (passEl?.value || '').trim();
+  if (!hash && pass.length >= 8) {
+    const h = await sha256hex(pass);
+    localStorage.setItem(LS_SYNC_HASH, h);
+  }
+  const key = localStorage.getItem(LS_SYNC_HASH);
+  if (!key) {
+    setCloudSyncStatus('Code secret requis (8+ caractères).', false);
+    return;
+  }
+  try {
+    setCloudSyncStatus('Téléchargement…', null);
+    const r = await fetch('/api/cloud-sync?key=' + encodeURIComponent(key));
+    const j = await r.json();
+    if (!j.ok) {
+      setCloudSyncStatus(j.error || 'Cloud indisponible', false);
+      return;
+    }
+    if (!j.data || !j.data.groups?.length) {
+      setCloudSyncStatus('Aucune sauvegarde cloud pour ce code.', false);
+      return;
+    }
+    applyingCloudBackup = true;
+    applySiteBackup(j.data);
+    applyingCloudBackup = false;
+    if (j.data.exportedAt) try { localStorage.setItem(LS_BACKUP_AT, j.data.exportedAt); } catch (e) {}
+    setCloudSyncStatus('☁ Restauré · ' + groups.length + ' groupe(s)', true);
+  } catch (e) {
+    applyingCloudBackup = false;
+    setCloudSyncStatus('Réseau : ' + (e.message || e), false);
+  }
+}
+async function activateCloudSync() {
+  const pass = (document.getElementById('cloud-sync-pass')?.value || '').trim();
+  if (pass.length < 8) {
+    setCloudSyncStatus('Code trop court (min. 8 caractères).', false);
+    return;
+  }
+  const hash = await sha256hex(pass);
+  localStorage.setItem(LS_SYNC_HASH, hash);
+  localStorage.setItem(LS_SYNC_AUTO, document.getElementById('cloud-sync-auto')?.checked ? '1' : '0');
+  await pushCloudBackup(true);
+}
+async function pullCloudOnBoot() {
+  const hash = localStorage.getItem(LS_SYNC_HASH);
+  if (!hash) return;
+  try {
+    const r = await fetch('/api/cloud-sync?key=' + encodeURIComponent(hash));
+    const j = await r.json();
+    if (!j.ok || !j.data?.groups?.length) return;
+    const localAt = localStorage.getItem(LS_BACKUP_AT) || '';
+    const cloudAt = j.data.exportedAt || '';
+    const localGroups = JSON.parse(localStorage.getItem('bt_groups') || 'null');
+    const onlyDefault = !localGroups || (localGroups.length === 1 && localGroups[0]?.id === 'bundlers');
+    if (cloudAt > localAt || onlyDefault) {
+      applyingCloudBackup = true;
+      applySiteBackup(j.data);
+      applyingCloudBackup = false;
+      if (cloudAt) localStorage.setItem(LS_BACKUP_AT, cloudAt);
+    }
+  } catch (e) {}
+}
+function loadCloudSyncSettingsUi() {
+  const auto = document.getElementById('cloud-sync-auto');
+  if (auto) auto.checked = localStorage.getItem(LS_SYNC_AUTO) !== '0';
+  if (localStorage.getItem(LS_SYNC_HASH)) {
+    setCloudSyncStatus('☁ Cloud actif — sauvegarde auto', true);
+  }
+}
 const getAG   = () => groups.find(g=>g.id===agid) || groups[0];
 const getWs   = () => groups.filter(g=>g.active!==false).flatMap(g=>g.wallets.map(w=>({...w,groupId:g.id,groupName:g.name,groupEmoji:g.emoji||'🎯'})));
 
@@ -1240,6 +1394,7 @@ function saveNtfyTopic() {
   if (hint) { hint.style.display = 'block'; hint.style.color = 'var(--green)'; hint.textContent = 'Enregistré — abonne-toi au même topic dans l’app ntfy.'; }
   setTimeout(() => { if (hint) hint.style.display = 'none'; }, 3500);
   updateNtfyStatusLine();
+  scheduleCloudBackup();
 }
 
 function setNtfyLastStatus(ok, detail, mint) {
@@ -1516,6 +1671,7 @@ function applySiteBackup(data) {
   reconnectAllWalletWs();
   refreshCloudConfigPreview();
   updateNtfyStatusLine();
+  if (!applyingCloudBackup) scheduleCloudBackup();
   return true;
 }
 
@@ -1556,14 +1712,6 @@ function importSiteBackupFromInput(ev) {
   reader.readAsText(file);
 }
 
-function maybeShowVercelBackupHint() {
-  const host = (location.hostname || '').toLowerCase();
-  if (!host.includes('vercel.app')) return;
-  const h = document.getElementById('backup-hint');
-  if (!h || h.textContent) return;
-  h.style.color = 'var(--orange)';
-  h.textContent = 'Sur Vercel : exporte d’abord depuis localhost (Paramètres → Exporter), puis importe ici.';
-}
 
 async function testNtfyPush() {
   saveNtfyTopic();
@@ -2377,7 +2525,7 @@ function goPage(page, el) {
   if(page==='groups') renderGList();
   if(page==='pumpswap') updatePsContinueBtn();
   if(page==='analysis') popSel();
-  if(page==='settings') { loadNtfyField(); loadPrefsIntoForm(); updateDeskNotifyStatus(); updateNtfyStatusLine(); refreshCloudConfigPreview(); maybeShowVercelBackupHint(); }
+  if(page==='settings') { loadNtfyField(); loadPrefsIntoForm(); updateDeskNotifyStatus(); updateNtfyStatusLine(); refreshCloudConfigPreview(); loadCloudSyncSettingsUi(); }
 }
 
 // ═══════ RISQUE HOLDERS (sans score numérique) ═══════
@@ -2600,8 +2748,9 @@ function saveSitePrefsFromForm() {
   sitePrefs.compactDexOverlay = pco ? pco.checked : false;
   try { localStorage.setItem(LS_PREFS, JSON.stringify(sitePrefs)); } catch(e) {}
   const h = document.getElementById('pref-save-hint');
-  if(h) { h.textContent = 'Enregistré.'; h.style.color = 'var(--green)'; setTimeout(() => { h.textContent = ''; }, 2000); }
+  if(h) { h.textContent = 'Enregistré.'; h.className = 'settings-status ok'; setTimeout(() => { h.textContent = ''; h.className = 'settings-status'; }, 2000); }
   refreshAllDexOverlaysDom();
+  scheduleCloudBackup();
 }
 function resetSitePrefsToDefaults() {
   sitePrefs = { ...PREFS_DEFAULT };
@@ -4719,18 +4868,23 @@ function rebuildGroupFilterPills(){
 }
 
 // ═══════ INIT ═══════
-restoreAlertsFromStorage();
-loadNtfyField();
-loadPrefsIntoForm();
-updateDeskNotifyStatus();
-updateNtfyStatusLine();
-refreshCloudConfigPreview();
-maybeShowVercelBackupHint();
-renderSB();
-popSel();
-setSt('wait','Démarrage...','');
-startPolling();
-void startAutoRefresh();
+async function boot() {
+  restoreAlertsFromStorage();
+  loadNtfyField();
+  loadPrefsIntoForm();
+  touchLocalBackupMeta();
+  await pullCloudOnBoot();
+  updateDeskNotifyStatus();
+  updateNtfyStatusLine();
+  refreshCloudConfigPreview();
+  loadCloudSyncSettingsUi();
+  renderSB();
+  popSel();
+  setSt('wait', 'Démarrage...', '');
+  startPolling();
+  void startAutoRefresh();
+}
+void boot();
 </script>
 </body>
 </html>
