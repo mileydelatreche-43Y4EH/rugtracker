@@ -6,7 +6,6 @@ export async function axiomTradeUrl(mint, pairAddress = '') {
   if (pairAddress) {
     return `https://axiom.trade/meme/${encodeURIComponent(pairAddress)}?chain=sol`;
   }
-  const m = String(mint || '').trim();
   if (!m) return 'https://axiom.trade/?chain=sol';
   if (pairCache.has(m)) return pairCache.get(m);
 
