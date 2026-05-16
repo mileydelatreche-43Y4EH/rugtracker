@@ -77,11 +77,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 .tok-ov--compact .tok-ov-l{font-size:8px}
 .tok-ov--compact .tok-ov-h{padding:4px 8px 0}
 .tok-ov--compact .tok-ov-row,.tok-ov--compact .tok-ov-row2{gap:3px;padding-left:8px;padding-right:8px}
-.pref-grid{display:grid;grid-template-columns:1fr 120px;gap:10px 14px;align-items:center;font-size:12px;color:var(--text2)}
-.pref-grid label{margin:0;line-height:1.35}
-.pref-grid input,.pref-grid select{width:100%;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px}
-.pref-hint{font-size:11px;color:var(--text3);margin-top:12px;line-height:1.55}
-.pref-row2{grid-column:1/-1}
+.pref-simple{display:flex;flex-direction:column;gap:16px;font-size:12px;color:var(--text2)}
+.pref-simple-row{display:flex;flex-direction:column;gap:6px}
+.pref-simple-row>label{font-weight:500;color:var(--text);font-size:12px}
+.pref-simple-row select,.pref-simple-row input[type=text]{width:100%;max-width:320px;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px}
+.pref-check{display:flex;align-items:flex-start;gap:8px;cursor:pointer;line-height:1.5}
+.pref-check input{accent-color:var(--purple);margin-top:2px;flex-shrink:0}
+.pref-hint{font-size:11px;color:var(--text3);margin-top:8px;line-height:1.55}
 .ps-feed{display:flex;flex-direction:column;gap:6px;margin-top:10px}
 .ps-row{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;font-size:11px;animation:slideIn .35s}
 .ps-row .ps-mint{flex:1;font-family:'Space Mono',monospace;font-size:10px;word-break:break-all;color:var(--green)}
@@ -359,99 +361,84 @@ select{font-family:'DM Sans',sans-serif;font-size:12px}
 
 <!-- PARAMÈTRES -->
 <div id="page-settings" class="page">
-  <div class="card" style="max-width:560px">
-    <div class="ch"><div class="ct">📱 Notifications téléphone (ntfy)</div></div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.7">Même sujet dans l’app <a href="https://ntfy.sh" target="_blank" rel="noopener" style="color:var(--purple2)">ntfy</a> et dans le champ ci‑dessous.</p>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.7">Sur PC sans app mobile : <a href="#" onclick="event.preventDefault();const t=getNtfyTopic(),h=document.getElementById('ntfy-hint');if(!t||t.length&lt;4){if(h){h.style.display='block';h.style.color='var(--orange)';h.textContent='Saisis le topic puis OK.';}return;}window.open('https://ntfy.sh/'+encodeURIComponent(t),'_blank','noopener');" style="color:var(--purple2)">ouvrir ntfy.sh</a> dans Chrome/Edge, puis autorise les notifs du site. Pour recevoir de nouveaux tokens, un appareil doit lancer le Bundle Tracker (ou publier sur ce topic).</p>
-    <div class="irow" style="align-items:center">
-      <input type="text" id="ntfy-topic" autocomplete="off" spellcheck="false" placeholder="topic_secret_unique"
-        style="flex:1;min-width:0;font-size:12px;padding:8px 10px;border-radius:7px"/>
-      <button type="button" class="btn-sm btn-sec" onclick="saveNtfyTopic()" style="flex-shrink:0;padding:8px 14px;font-size:12px">OK</button>
-      <button type="button" class="btn-sm btn-sec" onclick="testNtfyPush()" title="Envoie une notif test" style="flex-shrink:0;padding:8px 12px;font-size:12px">🧪 Test</button>
-    </div>
-    <div id="ntfy-hint" style="font-size:11px;color:var(--green);margin-top:10px;min-height:18px;display:none"></div>
-    <div id="ntfy-status-line" style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.55"></div>
-  </div>
-  
-  <div class="card" style="max-width:560px;margin-top:14px">
-    <div class="ch"><div class="ct">💾 Sauvegarde PC ↔ Vercel / téléphone</div></div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.7">Les <strong>groupes</strong> et réglages sont dans le <strong>navigateur</strong> (<code style="font-size:10px">localhost</code> ≠ <code style="font-size:10px">vercel.app</code>). Exporte sur le PC local, importe ici pour retrouver la même config.</p>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-      <button type="button" class="btn-sm btn-sec" onclick="exportSiteBackup()">⎘ Exporter backup (.json)</button>
+  <div class="card" style="max-width:520px">
+    <div class="ch"><div class="ct">💾 Sauvegarde</div></div>
+    <p class="pref-hint" style="margin-top:0">Groupes + réglages : <strong>localhost</strong> et <strong>vercel.app</strong> ne partagent pas les mêmes données.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
+      <button type="button" class="btn-sm btn-sec" onclick="exportSiteBackup()">⎘ Exporter (.json)</button>
       <label class="btn-sm btn-sec" style="cursor:pointer;margin:0;display:inline-flex;align-items:center">
-        📥 Importer backup
+        📥 Importer
         <input type="file" accept="application/json,.json" style="display:none" onchange="importSiteBackupFromInput(event)"/>
       </label>
     </div>
-    <div id="backup-hint" style="font-size:11px;color:var(--text3);line-height:1.55;min-height:16px"></div>
+    <div id="backup-hint" style="font-size:11px;color:var(--text3);line-height:1.55;min-height:16px;margin-top:8px"></div>
   </div>
-  <div class="card" style="max-width:560px;margin-top:14px">
-    <div class="ch"><div class="ct">☁ Notifications 24/7 (sans PC allumé)</div></div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.65">Le navigateur local ne peut pas envoyer de notifs quand il est fermé. Il faut un <strong>service cloud</strong> sur le même topic ntfy.</p>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.65"><strong>Recommandé :</strong> Railway / Render + <code style="font-size:10px">npm run worker</code>.</p>
-    <p style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.55"><strong>Vercel :</strong> site uniquement — notifs 24/7 via Railway.</p>
-    <button type="button" class="btn-sm" onclick="copyCloudNotifyConfig()" style="margin-bottom:10px">⎘ Copier config cloud (.env)</button>
-    <pre id="cloud-config-preview" style="font-size:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;max-height:120px;color:var(--text2);margin:0"></pre>
+
+  <div class="card" style="max-width:520px;margin-top:14px">
+    <div class="ch"><div class="ct">🔊 Sons & alertes (PC)</div></div>
+    <div class="pref-simple">
+      <div class="pref-simple-row">
+        <label for="pref-alert-sound">Bruit à l'achat détecté</label>
+        <select id="pref-alert-sound" onchange="saveSitePrefsFromForm()">
+          <option value="off">Silencieux</option>
+          <option value="classic">Classique (selon risque)</option>
+          <option value="soft">Doux</option>
+          <option value="urgent">Urgent</option>
+          <option value="coin">Coin</option>
+        </select>
+        <button type="button" class="btn-sm btn-sec" style="align-self:flex-start;margin-top:4px" onclick="previewAlertSound()">▶ Tester le son</button>
+      </div>
+      <label class="pref-check"><input type="checkbox" id="pref-desk-snd" onchange="saveSitePrefsFromForm()"/> Son Windows sur notif bureau</label>
+      <label class="pref-check"><input type="checkbox" id="pref-title-pulse" onchange="saveSitePrefsFromForm()"/> Titre d'onglet qui clignote</label>
+      <div class="pref-simple-row">
+        <label for="pref-desk-risk">Notifs bureau — niveau minimum</label>
+        <select id="pref-desk-risk" onchange="saveSitePrefsFromForm()">
+          <option value="OFF">Désactivées</option>
+          <option value="LOW">LOW et +</option>
+          <option value="MEDIUM">MEDIUM et +</option>
+          <option value="HIGH">HIGH et +</option>
+          <option value="DANGER">DANGER seulement</option>
+        </select>
+      </div>
+      <label class="pref-check"><input type="checkbox" id="pref-compact-ov" onchange="saveSitePrefsFromForm()"/> Cartes Dex plus compactes</label>
+    </div>
+    <span id="pref-save-hint" style="font-size:11px;color:var(--text3);display:block;margin-top:10px"></span>
   </div>
-<div class="card" style="max-width:560px;margin-top:14px">
-    <div class="ch"><div class="ct">🔔 Notifications Google Chrome / Windows</div></div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.7">Une alerte système (centre de notifications Windows) pour <strong>chaque nouveau token</strong> détecté, tant que l’onglet reste ouvert ou en arrière-plan. Chaque notif se ferme automatiquement après <strong>5 secondes</strong>. Plusieurs onglets du <strong>même</strong> navigateur : une seule notif par token (verrouillage interne).</p>
-    <p style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.7">Si la page tourne à la fois dans <strong>Chrome</strong> et dans l’<strong>aperçu Cursor / VS Code</strong>, Windows affiche deux notifs (deux apps). Décoche l’option ci‑dessous dans Cursor ou ferme l’un des deux navigateurs.</p>
-    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">
-      <button type="button" class="btn" onclick="requestDesktopNotify()">Autoriser les notifications navigateur</button>
+
+  <div class="card" style="max-width:520px;margin-top:14px">
+    <div class="ch"><div class="ct">📱 Téléphone (ntfy)</div></div>
+    <p class="pref-hint" style="margin-top:0">App <a href="https://ntfy.sh" target="_blank" rel="noopener" style="color:var(--purple2)">ntfy</a> — même topic. 24/7 sans PC → Railway.</p>
+    <div class="irow" style="align-items:center;margin-top:10px">
+      <input type="text" id="ntfy-topic" autocomplete="off" spellcheck="false" placeholder="ton_topic_secret" style="flex:1;min-width:0;font-size:12px;padding:8px 10px;border-radius:7px"/>
+      <button type="button" class="btn-sm btn-sec" onclick="saveNtfyTopic()" style="flex-shrink:0">OK</button>
+      <button type="button" class="btn-sm btn-sec" onclick="testNtfyPush()" style="flex-shrink:0">🧪 Test</button>
+    </div>
+    <div id="ntfy-hint" style="font-size:11px;color:var(--green);margin-top:8px;min-height:16px;display:none"></div>
+    <div id="ntfy-status-line" style="font-size:11px;color:var(--text3);margin-top:6px;line-height:1.55"></div>
+  </div>
+
+  <div class="card" style="max-width:520px;margin-top:14px">
+    <div class="ch"><div class="ct">🔔 PC — notifications Windows</div></div>
+    <p class="pref-hint" style="margin-top:0">Onglet ouvert. Fermeture auto après 5 s.</p>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px">
+      <button type="button" class="btn-sm" onclick="requestDesktopNotify()">Autoriser Chrome / Edge</button>
       <span id="desk-notify-status" style="font-size:12px;color:var(--text2)"></span>
     </div>
-    <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-top:12px;font-size:12px;color:var(--text2);line-height:1.5">
-      <input type="checkbox" id="pref-desk-ide-embed" style="accent-color:var(--purple);margin-top:2px;flex-shrink:0" onchange="saveSitePrefsFromForm()"/>
-      <span>Notifs bureau depuis l’aperçu <strong>Cursor / VS Code</strong> (désactivé par défaut pour éviter les doublons avec Chrome)</span>
-    </label>
+    <label class="pref-check" style="margin-top:12px"><input type="checkbox" id="pref-desk-ide-embed" onchange="saveSitePrefsFromForm()"/> Aussi depuis Cursor / VS Code (peut doubler)</label>
   </div>
-  <div class="card" style="max-width:560px;margin-top:14px">
-    <div class="ch"><div class="ct">⚡ Moteur, flux & affichage</div></div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.65">Réglages persistants (navigateur). Des valeurs trop agressives peuvent déclencher des limites Helius / DexScreener (HTTP 429).</p>
-    <div class="pref-grid">
-      <label for="pref-auto-sec">Intervalle rafraîchissement auto des cartes (s)</label><input type="number" id="pref-auto-sec" min="5" max="120" step="1"/>
-      <label for="pref-auto-gap">Pause entre 2 cartes lors du cycle (ms)</label><input type="number" id="pref-auto-gap" min="100" max="3000" step="50"/>
-      <label for="pref-auto-batch">Cartes max par cycle auto</label><input type="number" id="pref-auto-batch" min="1" max="30" step="1"/>
-      <label for="pref-rpc-delay">Délai entre requêtes RPC (ms)</label><input type="number" id="pref-rpc-delay" min="50" max="800" step="10"/>
-      <label for="pref-rpc-conc">Requêtes RPC en parallèle</label><input type="number" id="pref-rpc-conc" min="1" max="8" step="1"/>
-      <label for="pref-feed-max">Taille max du fil d’alertes</label><input type="number" id="pref-feed-max" min="15" max="120" step="5"/>
-      <label for="pref-fallback-sec">Intervalle secours wallets (s)</label><input type="number" id="pref-fallback-sec" min="3" max="120" step="1"/>
-      <label for="pref-fallback-hist">Délai entre txs historiques (ms)</label><input type="number" id="pref-fallback-hist" min="50" max="2000" step="50"/>
-      <label for="pref-fallback-wg">Pause entre wallets au chargement (ms)</label><input type="number" id="pref-fallback-wg" min="200" max="5000" step="100"/>
-      <label for="pref-tape-sec">Carnet (modal) — actualisation (s)</label><input type="number" id="pref-tape-sec" min="0.5" max="15" step="0.25"/>
-      <label for="pref-new-badge">Durée badge « NEW » sur carte (s)</label><input type="number" id="pref-new-badge" min="30" max="600" step="10"/>
-      <label for="pref-enrich-stagger">Délai avant lecture d’une tx (anti-burst, ms)</label><input type="number" id="pref-enrich-stagger" min="0" max="2000" step="50"/>
-      <label for="pref-desk-risk">Notif bureau — risque minimum</label>
-      <select id="pref-desk-risk">
-        <option value="OFF">Désactivé</option>
-        <option value="SAFE">SAFE et +</option>
-        <option value="LOW">LOW et +</option>
-        <option value="MEDIUM">MEDIUM et +</option>
-        <option value="HIGH">HIGH et +</option>
-        <option value="DANGER">DANGER uniquement</option>
-      </select>
-      <label for="pref-ws-commit">Logs wallets — commitment Solana</label>
-      <select id="pref-ws-commit">
-        <option value="processed">processed (plus rapide, moins final)</option>
-        <option value="confirmed">confirmed (recommandé)</option>
-      </select>
-      <div class="pref-row2" style="display:flex;flex-wrap:wrap;gap:14px 20px;margin-top:4px">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pref-sound" style="accent-color:var(--purple)"/> Sons d’alerte (bip à l’achat)</label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pref-desk-snd" style="accent-color:var(--purple)"/> Son système sur notif bureau</label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pref-title-pulse" style="accent-color:var(--purple)"/> Titre d’onglet clignotant sur nouveau token</label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pref-compact-ov" style="accent-color:var(--purple)"/> Bloc Dex compact sur les cartes</label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pref-vol-bar" style="accent-color:var(--purple)"/> Barre buys/sells 5m (vue token)</label>
-      </div>
-    </div>
-    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;align-items:center">
-      <button type="button" class="btn" onclick="saveSitePrefsFromForm()">Enregistrer ces réglages</button>
-      <button type="button" class="btn-sm btn-sec" onclick="resetSitePrefsToDefaults()">Réinitialiser défauts</button>
-      <span id="pref-save-hint" style="font-size:11px;color:var(--text3)"></span>
-    </div>
-    <p class="pref-hint">Le changement de <strong>commitment</strong> reconnecte les WebSockets. La taille du fil s’applique aux prochains ajouts (et à la sauvegarde locale). Les achats Pump restent en <strong>temps réel</strong> via WebSocket ; le rafraîchissement auto met à jour MC / Dex / holders sur le fil. Les valeurs par défaut ont été resserrées pour un affichage plus rapide — si tu vois des erreurs 429 Helius, augmente un peu le délai RPC ou ajoute des clés.</p>
+
+  <div class="card" style="max-width:520px;margin-top:14px">
+    <div class="ch"><div class="ct">☁ 24/7 sans PC (Railway)</div></div>
+    <p class="pref-hint" style="margin-top:0">Copie pour ton worker Railway.</p>
+    <button type="button" class="btn-sm btn-sec" onclick="copyCloudNotifyConfig()" style="margin-top:10px">⎘ Copier config Railway</button>
+    <pre id="cloud-config-preview" style="font-size:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;max-height:100px;color:var(--text2);margin:10px 0 0"></pre>
+  </div>
+
+  <div style="max-width:520px;margin-top:12px">
+    <button type="button" class="btn-sm btn-sec" onclick="resetSitePrefsToDefaults()">Réinitialiser tous les réglages</button>
   </div>
 </div>
+
 
 </div></div></div>
 
@@ -485,6 +472,7 @@ const PREFS_DEFAULT = {
   autoRefreshBatch: 10,
   newBadgeSec: 120,
   soundOn: true,
+  alertSoundPreset: 'classic',
   deskNotifySound: true,
   deskNotifyAllowIdeEmbed: false,
   deskNotifyMinRisk: 'LOW',
@@ -2429,22 +2417,44 @@ function predictRug(a) {
 
 // ═══════ SOUND ═══════
 let actx = null;
+function getAlertSoundPreset() {
+  const p = sitePrefs.alertSoundPreset || (sitePrefs.soundOn === false ? 'off' : 'classic');
+  if (p === 'off' || !sitePrefs.soundOn) return 'off';
+  return p;
+}
+function playAlertTone(risk, preset) {
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  const play = (freq, start, dur, vol = 0.25) => {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.connect(g); g.connect(actx.destination);
+    o.frequency.value = freq; o.type = 'sine';
+    g.gain.setValueAtTime(vol, actx.currentTime + start);
+    g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + start + dur);
+    o.start(actx.currentTime + start); o.stop(actx.currentTime + start + dur);
+  };
+  if (preset === 'soft') { play(330, 0, 0.18, 0.18); return; }
+  if (preset === 'urgent') { play(880, 0, 0.2); play(1200, 0.15, 0.2); play(880, 0.32, 0.2); return; }
+  if (preset === 'coin') { play(523, 0, 0.07); play(659, 0.07, 0.07); play(784, 0.14, 0.1); return; }
+  if (risk === 'DANGER') { play(880, 0, 0.25); play(1100, 0.3, 0.25); }
+  else if (risk === 'HIGH') { play(660, 0, 0.3); }
+  else { play(440, 0, 0.2); }
+}
 function playAlert(risk) {
   try {
-    if(!sitePrefs.soundOn) return;
-    if(!actx) actx=new(window.AudioContext||window.webkitAudioContext)();
-    const play=(freq,start,dur)=>{
-      const o=actx.createOscillator(),g=actx.createGain();
-      o.connect(g);g.connect(actx.destination);
-      o.frequency.value=freq;o.type='sine';
-      g.gain.setValueAtTime(0.25,actx.currentTime+start);
-      g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+start+dur);
-      o.start(actx.currentTime+start);o.stop(actx.currentTime+start+dur);
-    };
-    if(risk==='DANGER'){play(880,0,.25);play(1100,.3,.25);}
-    else if(risk==='HIGH'){play(660,0,.3);}
-    else{play(440,0,.2);}
-  }catch(e){}
+    const preset = getAlertSoundPreset();
+    if (preset === 'off') return;
+    playAlertTone(risk, preset);
+  } catch (e) {}
+}
+function previewAlertSound() {
+  const sel = document.getElementById('pref-alert-sound');
+  const preset = sel ? sel.value : getAlertSoundPreset();
+  if (preset === 'off') {
+    const h = document.getElementById('pref-save-hint');
+    if (h) { h.textContent = 'Son désactivé.'; h.style.color = 'var(--orange)'; }
+    return;
+  }
+  playAlertTone('HIGH', preset);
 }
 
 function copyMint(mint) {
@@ -2560,52 +2570,26 @@ function reconnectAllWalletWs() {
   syncWalletSubscriptions();
 }
 function loadPrefsIntoForm() {
-  const v = (id, x) => { const el = document.getElementById(id); if(el) el.value = x; };
   const c = (id, x) => { const el = document.getElementById(id); if(el) el.checked = !!x; };
-  v('pref-auto-sec', sitePrefs.autoRefreshSec);
-  v('pref-auto-gap', sitePrefs.autoRefreshCardGapMs);
-  v('pref-auto-batch', sitePrefs.autoRefreshBatch);
-  v('pref-rpc-delay', sitePrefs.rpcDelayMs);
-  v('pref-rpc-conc', sitePrefs.rpcConcurrency);
-  v('pref-feed-max', sitePrefs.feedMax);
-  v('pref-fallback-sec', sitePrefs.fallbackPollSec);
-  v('pref-fallback-hist', sitePrefs.fallbackHistoryDelayMs);
-  v('pref-fallback-wg', sitePrefs.fallbackWalletGapMs);
-  v('pref-tape-sec', sitePrefs.tapePollSec);
-  v('pref-new-badge', sitePrefs.newBadgeSec);
-  v('pref-enrich-stagger', sitePrefs.enrichStaggerMs);
+  if (!sitePrefs.alertSoundPreset) {
+    sitePrefs.alertSoundPreset = sitePrefs.soundOn === false ? 'off' : 'classic';
+  }
+  const as = document.getElementById('pref-alert-sound');
+  if (as) as.value = sitePrefs.alertSoundPreset || 'classic';
   const dr = document.getElementById('pref-desk-risk');
   if(dr) dr.value = sitePrefs.deskNotifyMinRisk || 'LOW';
-  const wc = document.getElementById('pref-ws-commit');
-  if(wc) wc.value = (sitePrefs.wsCommitment === 'processed' ? 'processed' : 'confirmed');
-  c('pref-sound', sitePrefs.soundOn !== false);
   c('pref-desk-snd', sitePrefs.deskNotifySound !== false);
   c('pref-desk-ide-embed', !!sitePrefs.deskNotifyAllowIdeEmbed);
   c('pref-title-pulse', !!sitePrefs.titlePulseOn);
   c('pref-compact-ov', !!sitePrefs.compactDexOverlay);
-  c('pref-vol-bar', sitePrefs.showDexVolBar !== false);
 }
 function saveSitePrefsFromForm() {
-  const prevCommit = String(sitePrefs.wsCommitment || 'confirmed');
-  const num = id => { const el = document.getElementById(id); return el ? el.value : ''; };
-  sitePrefs.autoRefreshSec = clampPref(num('pref-auto-sec'), 5, 120, 15);
-  sitePrefs.autoRefreshCardGapMs = clampPref(num('pref-auto-gap'), 100, 3000, 800);
-  sitePrefs.autoRefreshBatch = clampPref(num('pref-auto-batch'), 1, 30, 8);
-  sitePrefs.rpcDelayMs = clampPref(num('pref-rpc-delay'), 50, 800, 250);
-  sitePrefs.rpcConcurrency = clampPref(num('pref-rpc-conc'), 1, 8, 3);
-  sitePrefs.feedMax = clampPref(num('pref-feed-max'), 15, 120, 60);
-  sitePrefs.fallbackPollSec = clampPref(num('pref-fallback-sec'), 3, 120, 10);
-  sitePrefs.fallbackHistoryDelayMs = clampPref(num('pref-fallback-hist'), 50, 2000, 300);
-  sitePrefs.fallbackWalletGapMs = clampPref(num('pref-fallback-wg'), 200, 5000, 800);
-  sitePrefs.tapePollSec = clampPref(num('pref-tape-sec'), 0.5, 15, 0.8);
-  sitePrefs.newBadgeSec = clampPref(num('pref-new-badge'), 30, 600, 120);
-  sitePrefs.enrichStaggerMs = clampPref(num('pref-enrich-stagger'), 0, 2000, 200);
+  const asEl = document.getElementById('pref-alert-sound');
+  const preset = (asEl && asEl.value) ? asEl.value : 'classic';
+  sitePrefs.alertSoundPreset = preset;
+  sitePrefs.soundOn = preset !== 'off';
   const drEl = document.getElementById('pref-desk-risk');
   sitePrefs.deskNotifyMinRisk = (drEl && drEl.value) ? drEl.value : 'LOW';
-  const wcEl = document.getElementById('pref-ws-commit');
-  sitePrefs.wsCommitment = (wcEl && wcEl.value === 'processed') ? 'processed' : 'confirmed';
-  const ps = document.getElementById('pref-sound');
-  sitePrefs.soundOn = ps ? ps.checked : true;
   const pds = document.getElementById('pref-desk-snd');
   sitePrefs.deskNotifySound = pds ? pds.checked : true;
   const pie = document.getElementById('pref-desk-ide-embed');
@@ -2614,21 +2598,15 @@ function saveSitePrefsFromForm() {
   sitePrefs.titlePulseOn = ptp ? ptp.checked : false;
   const pco = document.getElementById('pref-compact-ov');
   sitePrefs.compactDexOverlay = pco ? pco.checked : false;
-  const pvb = document.getElementById('pref-vol-bar');
-  sitePrefs.showDexVolBar = pvb ? pvb.checked : true;
   try { localStorage.setItem(LS_PREFS, JSON.stringify(sitePrefs)); } catch(e) {}
   const h = document.getElementById('pref-save-hint');
-  if(h) { h.textContent = 'Enregistré.'; h.style.color = 'var(--green)'; setTimeout(() => { h.textContent = ''; }, 2500); }
-  if(prevCommit !== sitePrefs.wsCommitment) reconnectAllWalletWs();
-  restartTapeTimerIfRunning();
+  if(h) { h.textContent = 'Enregistré.'; h.style.color = 'var(--green)'; setTimeout(() => { h.textContent = ''; }, 2000); }
   refreshAllDexOverlaysDom();
 }
 function resetSitePrefsToDefaults() {
   sitePrefs = { ...PREFS_DEFAULT };
   try { localStorage.setItem(LS_PREFS, JSON.stringify(sitePrefs)); } catch(e) {}
   loadPrefsIntoForm();
-  reconnectAllWalletWs();
-  restartTapeTimerIfRunning();
   refreshAllDexOverlaysDom();
   const h = document.getElementById('pref-save-hint');
   if(h) { h.textContent = 'Défauts restaurés.'; h.style.color = 'var(--orange)'; setTimeout(() => { h.textContent = ''; }, 2500); }
