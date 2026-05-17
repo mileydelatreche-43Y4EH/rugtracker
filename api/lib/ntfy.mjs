@@ -24,5 +24,9 @@ export async function postNtfy(topic, body, meta = {}) {
       Click: meta.click || '',
     },
   });
-  return { ok: r.ok, status: r.status };
+  if (!r.ok) {
+    const errBody = await r.text().catch(() => '');
+    throw new Error(`ntfy HTTP ${r.status}${errBody ? `: ${errBody.slice(0, 120)}` : ''}`);
+  }
+  return { ok: true, status: r.status };
 }

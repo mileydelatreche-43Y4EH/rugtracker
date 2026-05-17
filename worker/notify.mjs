@@ -2,10 +2,10 @@
  * Worker 24/7 — WebSocket Helius + push ntfy (format = bureau, latence min.)
  */
 import { readFileSync, existsSync } from 'fs';
+import http from 'http';
 import { notifyBuyFast } from '../api/lib/notify-fast.mjs';
-import { heliusRpcUrl, rpc, extractPumpBuyFromTx } from '../api/lib/solana.mjs';
-
-const PUMP = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P';
+import { postNtfy, ntfyHeaderAscii } from '../api/lib/ntfy.mjs';
+import { heliusRpcUrl, rpc, extractAnyBuyFromTx, PUMP, PUMP_SWAP } from '../api/lib/solana.mjs';
 
 function loadEnvFile() {
   const p = new URL('../.env', import.meta.url);
@@ -41,13 +41,22 @@ loadEnvFile();
 
 const HELIUS_KEYS = parseHeliusKeys();
 const topic = (process.env.NTFY_TOPIC || '').trim();
-let wallets = [];
-try {
-  wallets = JSON.parse(process.env.WATCH_WALLETS || '[]');
-} catch {
-  console.error('WATCH_WALLETS JSON invalide');
-  process.exit(1);
+function parseWatchWallets(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return [];
+  try {
+    const j = JSON.parse(s);
+    return Array.isArray(j) ? j : [];
+  } catch {
+    try {
+      const j = JSON.parse(s.replace(/'/g, '"'));
+      return Array.isArray(j) ? j : [];
+    } catch {}
+  }
+  return [];
 }
+
+const wallets = parseWatchWallets(process.env.WATCH_WALLETS).filter(w => w && w.addr);
 
 if (!HELIUS_KEYS.length || !topic || !wallets.length) {
   console.error('Requis : HELIUS_API_KEY (ou HELIUS_API_KEYS), NTFY_TOPIC, WATCH_WALLETS');
@@ -66,16 +75,21 @@ function wsUrlForKey(key) {
 }
 
 const seenSigs = new Set();
-const seenMints = new Set();
+const seenMintKeys = new Set();
 const isRailway = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID);
 const singleKey = HELIUS_KEYS.length === 1;
 const railwayPollOnly = isRailway && singleKey && process.env.RAILWAY_WS_MODE !== '1';
 const wsCommitment =
   process.env.WORKER_WS_COMMITMENT === 'confirmed' ? 'confirmed' : 'processed';
 const walletIndexByAddr = new Map(wallets.map((w, i) => [w.addr, i]));
+const warmSigAgeSec = Number(process.env.WARM_SIG_AGE_SEC || 300);
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
+}
+
+function mintDedupeKey(w, mint) {
+  return `${w.addr}:${mint}`;
 }
 
 async function rpcCall(method, params, keyIndex = 0) {
@@ -93,28 +107,66 @@ async function rpcCall(method, params, keyIndex = 0) {
   }
 }
 
-async function handleSig(w, sig) {
-  if (!sig || seenSigs.has(sig)) return;
+async function fetchTxForSig(sig, wi) {
+  const attempts = Number(process.env.TX_FETCH_RETRIES || 5);
+  for (let a = 0; a < attempts; a++) {
+    const tx = await rpcCall(
+      'getTransaction',
+      [sig, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }],
+      wi,
+    );
+    if (tx) return tx;
+    if (a < attempts - 1) await sleep(280 * (a + 1));
+  }
+  return null;
+}
+
+function logsLookLikeBuy(logs) {
+  const s = String(logs || '');
+  if (!s.includes('Instruction: Buy')) return false;
+  return s.includes(PUMP) || s.includes(PUMP_SWAP);
+}
+
+async function handleSig(w, sig, { fromWarm = false } = {}) {
+  if (!sig) return;
+  if (seenSigs.has(sig)) return;
   seenSigs.add(sig);
   if (seenSigs.size > 8000) {
     const a = [...seenSigs];
     seenSigs.clear();
     a.slice(-4000).forEach(s => seenSigs.add(s));
   }
+
   const wi = walletIndexByAddr.get(w.addr) ?? 0;
   try {
-    const tx = await rpcCall(
-      'getTransaction',
-      [sig, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }],
-      wi,
-    );
-    const hit = extractPumpBuyFromTx(tx, w.addr);
+    const tx = await fetchTxForSig(sig, wi);
+    if (!tx) {
+      console.warn(`⏳ tx pas encore dispo ${w.label} ${sig.slice(0, 12)}… — retry poll`);
+      seenSigs.delete(sig);
+      return;
+    }
+    const hit = extractAnyBuyFromTx(tx, w.addr);
     if (!hit) return;
-    if (seenMints.has(hit.mint)) return;
-    seenMints.add(hit.mint);
+
+    const dedupe = mintDedupeKey(w, hit.mint);
+    if (seenMintKeys.has(dedupe)) {
+      console.log(`↩ déjà notifié ${w.label} · ${hit.mint.slice(0, 8)}…`);
+      return;
+    }
+    seenMintKeys.add(dedupe);
+    if (seenMintKeys.size > 4000) {
+      const keep = [...seenMintKeys].slice(-2000);
+      seenMintKeys.clear();
+      keep.forEach(k => seenMintKeys.add(k));
+    }
+
+    console.log(
+      `🛒 achat ${w.label} · ${hit.mint.slice(0, 8)}… · ${hit.venue || 'curve'}${fromWarm ? ' (warm)' : ''}`,
+    );
     await notifyBuyFast(topic, w, hit, rpcCall, wi);
   } catch (e) {
     console.warn('handleSig', w.label, e.message || e);
+    if (!fromWarm) seenSigs.delete(sig);
   }
 }
 
@@ -152,7 +204,7 @@ function startWalletWs(w, walletIndex) {
         if (!val) return;
         const logs = (val.logs || []).join(' ');
         const sig = val.signature || '';
-        if (!logs.includes(PUMP) || !logs.includes('Instruction: Buy')) return;
+        if (!logsLookLikeBuy(logs)) return;
         void handleSig(w, sig);
       } catch {}
     };
@@ -180,30 +232,40 @@ function startWalletWs(w, walletIndex) {
 }
 
 async function warmStartSigsOnly() {
+  const now = Math.floor(Date.now() / 1000);
   for (let i = 0; i < wallets.length; i++) {
     const w = wallets[i];
     try {
-      const sigs = await rpcCall('getSignaturesForAddress', [w.addr, { limit: 12 }], i);
+      const sigs = await rpcCall('getSignaturesForAddress', [w.addr, { limit: 15 }], i);
       for (const s of sigs || []) {
-        if (s.signature) seenSigs.add(s.signature);
+        if (!s.signature) continue;
+        const age = s.blockTime ? now - s.blockTime : 0;
+        if (age > warmSigAgeSec) {
+          seenSigs.add(s.signature);
+          continue;
+        }
+        await handleSig(w, s.signature, { fromWarm: true });
+        await sleep(120);
       }
     } catch (e) {
       console.warn('warmStart', w.label, e.message || e);
     }
     await sleep(400);
   }
-  console.log(`Warm-start : ${seenSigs.size} sig(s) (anti-doublon)`);
+  console.log(
+    `Warm-start : ${seenSigs.size} sig(s) anciennes ignorées · fenêtre récente ${warmSigAgeSec}s traitée`,
+  );
 }
 
 async function pollLoop() {
-  const interval = Number(process.env.POLL_INTERVAL_SEC || 12) * 1000;
+  const interval = Number(process.env.POLL_INTERVAL_SEC || (isRailway ? 8 : 12)) * 1000;
   console.log(`📡 Poll secours : ${interval / 1000}s`);
   while (true) {
     for (let i = 0; i < wallets.length; i++) {
       const w = wallets[i];
       if (!w.addr) continue;
       try {
-        const sigs = await rpcCall('getSignaturesForAddress', [w.addr, { limit: 5 }], i);
+        const sigs = await rpcCall('getSignaturesForAddress', [w.addr, { limit: 8 }], i);
         for (const s of sigs || []) {
           if (!s.signature || seenSigs.has(s.signature)) continue;
           await handleSig(w, s.signature);
@@ -212,21 +274,66 @@ async function pollLoop() {
         console.warn('poll', w.label, e.message || e);
         await sleep(2000);
       }
-      await sleep(500);
+      await sleep(400);
     }
     await sleep(interval);
   }
 }
 
+function startHealthServer() {
+  const port = Number(process.env.PORT || 0);
+  if (!port) return;
+  http
+    .createServer((req, res) => {
+      const body = JSON.stringify({
+        ok: true,
+        role: 'notify-worker',
+        wallets: wallets.length,
+        heliusKeys: HELIUS_KEYS.length,
+        topicLen: topic.length,
+        uptimeSec: Math.floor(process.uptime()),
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(body);
+    })
+    .listen(port, () => console.log(`🏥 Health :0:${port}/`));
+}
+
+async function startupNtfyPing() {
+  if (process.env.SKIP_STARTUP_NTFY === '1') return;
+  const labels = wallets.map(w => w.label || w.addr.slice(0, 6)).join(', ');
+  await postNtfy(
+    topic,
+    `Worker 24/7 actif — ${wallets.length} wallet(s) : ${labels}`,
+    {
+      title: ntfyHeaderAscii('Bundle Tracker 24/7 OK'),
+      priority: 'default',
+      tags: 'white_check_mark',
+    },
+  );
+  console.log('✅ Ping ntfy démarrage envoyé (vérifie PC + téléphone)');
+}
+
 console.log(
   `Bundle Tracker worker — ${wallets.length} wallet(s) · ${HELIUS_KEYS.length} clé(s) Helius · ntfy:${topic} · WS ${wsCommitment}`,
 );
+wallets.forEach(w => console.log(`   · ${w.label || '?'} → ${String(w.addr).slice(0, 8)}…`));
+
+startHealthServer();
+
+try {
+  await startupNtfyPing();
+} catch (e) {
+  console.error('❌ Impossible d’envoyer sur ntfy au démarrage :', e.message || e);
+  console.error('   Vérifie NTFY_TOPIC et que ntfy.sh est joignable.');
+  process.exit(1);
+}
 
 if (isRailway) {
   console.log(
     railwayPollOnly
       ? 'Mode Railway : 1 clé → poll uniquement'
-      : `Mode Railway : ${HELIUS_KEYS.length} clé(s) → WebSocket temps réel`,
+      : `Mode Railway : ${HELIUS_KEYS.length} clé(s) → WebSocket + poll secours`,
   );
 }
 
@@ -244,12 +351,12 @@ if (!railwayPollOnly) {
   }
 }
 
-const wantPoll =
-  railwayPollOnly ||
-  process.env.ENABLE_POLL_FALLBACK === '1' ||
-  (isRailway && singleKey);
+const pollOff = process.env.ENABLE_POLL_FALLBACK === '0';
+const wantPoll = railwayPollOnly || !pollOff || (isRailway && singleKey);
 if (wantPoll) {
   void pollLoop();
+} else {
+  console.log('Poll secours désactivé (ENABLE_POLL_FALLBACK=0)');
 }
 
 setInterval(() => {}, 60000);

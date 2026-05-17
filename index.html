@@ -430,8 +430,8 @@ select{font-family:'DM Sans',sans-serif;font-size:12px}
   </div>
 
   <div class="settings-card">
-    <p class="settings-title">📱 Téléphone (ntfy)</p>
-    <p class="settings-desc">App <a href="https://ntfy.sh" target="_blank" rel="noopener" style="color:var(--purple2)">ntfy</a> — même topic. 24/7 → Railway.</p>
+    <p class="settings-title">📱 PC + téléphone (ntfy, sans site ouvert)</p>
+    <p class="settings-desc">App ou site <a href="https://ntfy.sh" target="_blank" rel="noopener" style="color:var(--purple2)">ntfy</a> — même topic sur les deux. Les achats 24/7 viennent de <strong>Railway</strong>, pas du navigateur. Si tu ne reçois rien sans onglet ouvert → Railway mal configuré (voir ci-dessous).</p>
     <div class="irow" style="align-items:center;margin-top:8px">
       <input type="text" id="ntfy-topic" autocomplete="off" spellcheck="false" placeholder="ton_topic_secret" style="flex:1;min-width:0;font-size:12px;padding:8px 10px;border-radius:7px"/>
       <button type="button" class="btn-sm btn-sec" onclick="saveNtfyTopic()">OK</button>
@@ -452,8 +452,8 @@ select{font-family:'DM Sans',sans-serif;font-size:12px}
   </div>
 
   <div class="settings-card">
-    <p class="settings-title">☁ Railway 24/7</p>
-    <p class="settings-desc">Config worker (notifs sans PC).</p>
+    <p class="settings-title">☁ Railway 24/7 (obligatoire)</p>
+    <p class="settings-desc">Start = <code style="font-size:10px">node worker/notify.mjs</code> · Build vide. Au redeploy tu dois recevoir « Bundle Tracker 24/7 OK » sur ntfy. Sinon le worker ne tourne pas.</p>
     <button type="button" class="btn-sm btn-sec" onclick="copyCloudNotifyConfig()" style="margin-top:8px">⎘ Copier config</button>
     <pre id="cloud-config-preview" style="font-size:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;max-height:90px;color:var(--text2);margin:10px 0 0"></pre>
   </div>
@@ -1597,13 +1597,15 @@ async function notifyDesktopNewToken(al, w, sym, imgUrl, snap) {
 function buildCloudNotifyEnvText() {
   const wallets = getWs().map(w => ({ addr: w.addr, label: w.label || w.addr.slice(0, 8) }));
   const topic = getNtfyTopic();
-  const keyHint = (RPCS[0] || '').split('api-key=')[1] || 'TA_CLE_HELIUS';
+  const keys = RPCS.map(u => (String(u).split('api-key=')[1] || '').split('&')[0].trim()).filter(k => k.length > 10);
   const wl = JSON.stringify(wallets, null, 2);
   return [
-    'HELIUS_API_KEY=' + keyHint,
+    'HELIUS_API_KEYS=' + (keys.length ? keys.join(',') : 'CLE1,CLE2,CLE3'),
     'NTFY_TOPIC=' + (topic || 'ton_topic_secret'),
     'WATCH_WALLETS=' + JSON.stringify(wallets),
-    'CRON_SECRET=change_moi_aleatoire',
+    '',
+    '# Railway → Settings → Deploy : Start Command = node worker/notify.mjs',
+    '# Build Command = (vide)',
     '',
     '# WATCH_WALLETS (lisible) :',
     '# ' + wl.replace(/\n/g, '\n# '),

@@ -34,7 +34,7 @@ export async function notifyBuyFast(topic, w, hit, rpcCall, walletIndex = 0) {
     title: ntfyHeaderAscii(title),
     click,
     tags: 'warning,money',
-    priority: 'max',
+    priority: 'urgent',
   });
 
   console.log(`📱 ntfy → ${label} · ${meta.sym} · ${meta.snap?.risk || '?'}`);

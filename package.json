@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "worker": "node worker/notify.mjs"
+    "worker": "node worker/notify.mjs",
+    "start": "node worker/notify.mjs"
   },
   "dependencies": {
     "@vercel/kv": "^3.0.0"
