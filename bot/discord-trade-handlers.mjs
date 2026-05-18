@@ -24,6 +24,7 @@ import {
   tradeCustomSellModal,
 } from './discord-trade-panel.mjs';
 import { renderSnipeScreen } from './discord-snipe-panel.mjs';
+import { dismissEphemeral, showEphemeralError } from './discord-ui.mjs';
 
 async function updateTradeScreen(interaction, screen) {
   await interaction.deferUpdate();
@@ -67,12 +68,8 @@ export async function handleTradePanelButton(interaction) {
     return true;
   }
   if (id === TCID.PRIO) {
-    const next = cyclePriorityPreset();
+    cyclePriorityPreset();
     await updateTradeScreen(interaction, 'trade');
-    await interaction.followUp({
-      content: `⚡ Priority fee : **${next.name}** · **${formatSolLabel(next.sol)}**`,
-      ephemeral: true,
-    });
     return true;
   }
   if (id === TCID.PRIO_CUSTOM) {
@@ -82,7 +79,6 @@ export async function handleTradePanelButton(interaction) {
   if (id === TCID.REFRESH_BAL) {
     clearBalanceCache();
     await updateTradeScreen(interaction, 'trade');
-    await interaction.followUp({ content: '🔄 Soldes mis à jour.', ephemeral: true });
     return true;
   }
   if (id === TCID.WL_ADD) {
@@ -95,9 +91,8 @@ export async function handleTradePanelButton(interaction) {
   }
 
   if (id === TCID.MULTI) {
-    const mode = cycleMultiWalletMode();
+    cycleMultiWalletMode();
     await updateTradeScreen(interaction, 'trade');
-    await interaction.followUp({ content: `👛 Mode multi-wallet : **${mode}**`, ephemeral: true });
     return true;
   }
 
@@ -131,10 +126,6 @@ export async function handleTradePanelSelect(interaction) {
     if (ids.size >= all.length) ids = new Set();
     patchTradeSettings({ enabledWalletIds: [...ids] });
     await updateTradeScreen(interaction, 'trade_wallets');
-    await interaction.followUp({
-      content: enabled ? `🟢 **${walletId}** activé.` : `⚪ **${walletId}** désactivé.`,
-      ephemeral: true,
-    });
     return true;
   }
 
@@ -142,7 +133,6 @@ export async function handleTradePanelSelect(interaction) {
     removeTradeWallet(value);
     clearBalanceCache();
     await interaction.update(await renderTradeScreen('trade_wl_rm'));
-    await interaction.followUp({ content: '🗑 Wallet trading retiré.', ephemeral: true });
     return true;
   }
 
@@ -190,7 +180,7 @@ export async function handleTradeAlertButton(interaction) {
       content: `**${parsed.type === 'sell' ? 'Vente' : 'Achat'}** · \`${parsed.mint.slice(0, 8)}…\`\n${result.text}`,
     });
   } catch (e) {
-    await interaction.editReply({ content: `❌ ${e.message || e}` });
+    await showEphemeralError(interaction, e.message || String(e));
   }
   return true;
 }
@@ -206,7 +196,7 @@ export async function handleTradeModal(interaction) {
       const result = await executeBuyTrade({ mint, solAmount: sol });
       await interaction.editReply({ content: result.text });
     } catch (e) {
-      await interaction.editReply({ content: `❌ ${e.message}` });
+      await showEphemeralError(interaction, e.message);
     }
     return true;
   }
@@ -219,7 +209,7 @@ export async function handleTradeModal(interaction) {
       const result = await executeSellTrade({ mint, sellPct: pct });
       await interaction.editReply({ content: result.text });
     } catch (e) {
-      await interaction.editReply({ content: `❌ ${e.message}` });
+      await showEphemeralError(interaction, e.message);
     }
     return true;
   }
@@ -230,45 +220,42 @@ export async function handleTradeModal(interaction) {
     if (cid === TCID.MODAL_BUY_PRESETS) {
       const presets = parsePresetList(interaction.fields.getTextInputValue('presets'));
       patchTradeSettings({ buyPresetsSol: presets });
-      await interaction.editReply({ content: `✅ Achats : ${presets.map(p => formatSolLabel(p)).join(' · ')}` });
+      await dismissEphemeral(interaction);
       return true;
     }
     if (cid === TCID.MODAL_SELL_PRESETS) {
-      const presets = parsePresetList(interaction.fields.getTextInputValue('presets'), true);
-      patchTradeSettings({ sellPresetsPct: presets });
-      await interaction.editReply({ content: `✅ Ventes : ${presets.join(', ')}%` });
+      patchTradeSettings({
+        sellPresetsPct: parsePresetList(interaction.fields.getTextInputValue('presets'), true),
+      });
+      await dismissEphemeral(interaction);
       return true;
     }
     if (cid === TCID.MODAL_SLIP) {
-      const bps = parseInt(interaction.fields.getTextInputValue('bps'), 10);
-      patchTradeSettings({ slippageBps: bps });
-      await interaction.editReply({ content: `✅ Slippage : ${(bps / 100).toFixed(1)}%` });
+      patchTradeSettings({ slippageBps: parseInt(interaction.fields.getTextInputValue('bps'), 10) });
+      await dismissEphemeral(interaction);
       return true;
     }
     if (cid === TCID.MODAL_PRIO) {
       const sol = parseFloat(interaction.fields.getTextInputValue('sol'));
       patchTradeSettings({ priorityFeeLamports: solToLamports(sol) });
-      await interaction.editReply({ content: `✅ Priority fee : **${formatSolLabel(sol)}**` });
+      await dismissEphemeral(interaction);
       return true;
     }
     if (cid === TCID.MODAL_WL_ADD) {
       const label = interaction.fields.getTextInputValue('label').trim();
       const secret = interaction.fields.getTextInputValue('secret').trim();
-      const w = addTradeWallet(label, secret);
+      addTradeWallet(label, secret);
       clearBalanceCache();
-      await interaction.editReply({
-        content: `✅ Wallet **${w.label}** · \`${w.pubkey.slice(0, 8)}…\``,
-      });
+      await dismissEphemeral(interaction);
       return true;
     }
     if (cid === TCID.MODAL_RESERVE) {
-      const sol = parseFloat(interaction.fields.getTextInputValue('sol'));
-      patchTradeSettings({ minSolReserve: sol });
-      await interaction.editReply({ content: `✅ Réserve : ${formatSolLabel(sol)}` });
+      patchTradeSettings({ minSolReserve: parseFloat(interaction.fields.getTextInputValue('sol')) });
+      await dismissEphemeral(interaction);
       return true;
     }
   } catch (e) {
-    await interaction.editReply({ content: `❌ ${e.message || e}` });
+    await showEphemeralError(interaction, e.message || String(e));
     return true;
   }
 

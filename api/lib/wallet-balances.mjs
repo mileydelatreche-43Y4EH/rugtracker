@@ -46,6 +46,23 @@ export function formatWalletBalanceLine(w, enabled = true) {
   return `${status} **${w.label}** · ${bal}\n\`${w.pubkey}\``;
 }
 
+/** Accueil Discord : montant SOL au-dessus du nom du wallet. */
+export function formatHomeWalletsBlock(balances, enabledIds = []) {
+  if (!balances.length) {
+    return '_Aucun wallet — **Paramètres → Trading → Wallets trading**._';
+  }
+  const enabled = new Set(enabledIds);
+  const allOn = !enabled.size;
+  const total = balances.reduce((s, w) => s + (w.sol ?? 0), 0);
+  const lines = balances.map(w => {
+    const on = allOn || enabled.has(w.id);
+    const bal = w.sol == null ? '…' : formatSolLabel(w.sol);
+    const mark = on ? '🟢' : '⚪';
+    return `${mark} **${bal}**\n**${w.label}**`;
+  });
+  return [`**Total** · **${formatSolLabel(total)}**`, '', ...lines].join('\n\n');
+}
+
 export function formatWalletsBalanceBlock(balances, enabledIds = []) {
   if (!balances.length) return '_Aucun wallet de trading._';
   const enabled = new Set(enabledIds);

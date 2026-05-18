@@ -88,14 +88,12 @@ export function buildBuyButtons(links, mint) {
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`${COPY_CA_PREFIX}${m}`)
-      .setLabel('Copier CA')
-      .setStyle(ButtonStyle.Secondary)
-      .setEmoji('📋'),
+      .setLabel('📋 Copier CA')
+      .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId(`${ALERT_MENU_PREFIX}${m}`)
-      .setLabel('Menu')
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji('☰'),
+      .setLabel('☰ Menu')
+      .setStyle(ButtonStyle.Primary),
   );
   const rows = [row1, row2];
   const tradeRows = buildTradeButtonRows(m);
@@ -118,9 +116,8 @@ export function buildAlertMenuComponents(links, mint) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`${COPY_CA_PREFIX}${m}`)
-        .setLabel('Copier CA')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('📋'),
+        .setLabel('📋 Copier CA')
+        .setStyle(ButtonStyle.Secondary),
     ),
   ];
 }

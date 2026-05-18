@@ -1,6 +1,5 @@
 import { upsertSnipe, removeSnipe, toggleSnipeAuto, getSnipeByAddr } from '../api/lib/snipe-settings.mjs';
 import { getActiveWallets } from '../api/lib/wallet-store.mjs';
-import { formatSolLabel } from '../api/lib/trade-format.mjs';
 import {
   SCID,
   renderSnipeScreen,
@@ -8,6 +7,7 @@ import {
   snipeMcModal,
   buildSnipeConfigPanel,
 } from './discord-snipe-panel.mjs';
+import { dismissEphemeral, showEphemeralError } from './discord-ui.mjs';
 
 export function isSnipePanelId(id) {
   return (
@@ -76,10 +76,6 @@ export async function handleSnipePanelSelect(interaction) {
       autoBuy: { enabled: false },
     });
     await updateSnipeScreen(interaction, 'snipe_cfg', value);
-    await interaction.followUp({
-      content: `✅ **${w?.label || value.slice(0, 8)}** ajouté au sniping. Active l’auto-buy dans sa config.`,
-      ephemeral: true,
-    });
     return true;
   }
 
@@ -89,13 +85,8 @@ export async function handleSnipePanelSelect(interaction) {
   }
 
   if (id === SCID.SEL_RM) {
-    const w = getActiveWallets().find(x => x.addr === value);
     removeSnipe(value);
     await updateSnipeScreen(interaction, 'snipe');
-    await interaction.followUp({
-      content: `🗑 Snipe retiré : **${w?.label || value.slice(0, 8)}**`,
-      ephemeral: true,
-    });
     return true;
   }
 
@@ -111,7 +102,7 @@ export async function handleSnipeModal(interaction) {
       const addr = cid.slice(SCID.MODAL_SOL.length);
       const sol = parseFloat(interaction.fields.getTextInputValue('sol'));
       upsertSnipe(addr, { autoBuy: { solAmount: sol } });
-      await interaction.editReply({ content: `✅ Snipe auto : ${formatSolLabel(sol)}` });
+      await dismissEphemeral(interaction);
       return true;
     }
     if (cid.startsWith(SCID.MODAL_MC)) {
@@ -119,11 +110,11 @@ export async function handleSnipeModal(interaction) {
       const min = parseFloat(interaction.fields.getTextInputValue('min'));
       const max = parseFloat(interaction.fields.getTextInputValue('max'));
       upsertSnipe(addr, { autoBuy: { minMcUsd: min, maxMcUsd: max } });
-      await interaction.editReply({ content: `✅ MC snipe : ${min} – ${max} USD` });
+      await dismissEphemeral(interaction);
       return true;
     }
   } catch (e) {
-    await interaction.editReply({ content: `❌ ${e.message || e}` });
+    await showEphemeralError(interaction, e.message || String(e));
     return true;
   }
   return false;

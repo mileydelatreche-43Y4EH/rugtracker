@@ -91,6 +91,8 @@ function normalizeStore(data) {
     for (const w of g.wallets) {
       w.addr = String(w.addr).trim();
       w.label = w.label || w.addr.slice(0, 8);
+      if (w.alertsOn === undefined) w.alertsOn = true;
+      w.alertsOn = w.alertsOn !== false;
     }
   });
   return data;
@@ -137,10 +139,9 @@ export function onStoreChange(fn) {
   return () => listeners.delete(fn);
 }
 
-export function getActiveWallets(store = loadStore()) {
+export function getAllWalletsFlat(store = loadStore()) {
   const out = [];
   store.groups.forEach((g, gi) => {
-    if (g.active === false) return;
     const groupColor = groupEmbedColor(g, gi);
     for (const w of g.wallets) {
       if (!w?.addr) continue;
@@ -151,10 +152,53 @@ export function getActiveWallets(store = loadStore()) {
         groupName: g.name,
         groupEmoji: g.emoji || '🎯',
         groupColor,
+        groupActive: g.active !== false,
+        alertsOn: w.alertsOn !== false,
       });
     }
   });
   return out;
+}
+
+/** Wallets surveillés (groupe actif + alertes ON). */
+export function getActiveWallets(store = loadStore()) {
+  return getAllWalletsFlat(store).filter(w => w.groupActive && w.alertsOn);
+}
+
+export function toggleWalletAlerts(addr) {
+  const store = loadStore();
+  const a = String(addr).trim();
+  let found = false;
+  let next = true;
+  for (const g of store.groups) {
+    for (const w of g.wallets) {
+      if (w.addr !== a) continue;
+      found = true;
+      next = !w.alertsOn;
+      w.alertsOn = next;
+    }
+  }
+  if (!found) throw new Error('Wallet introuvable.');
+  saveStore(store);
+  return next;
+}
+
+export function setAllWalletAlerts(enabled) {
+  const store = loadStore();
+  const on = !!enabled;
+  for (const g of store.groups) {
+    for (const w of g.wallets) {
+      w.alertsOn = on;
+    }
+  }
+  saveStore(store);
+  return on;
+}
+
+export function alertsLiveSummary(store = loadStore()) {
+  const all = getAllWalletsFlat(store);
+  const on = all.filter(w => w.alertsOn && w.groupActive).length;
+  return { total: all.length, on, off: all.length - all.filter(w => w.alertsOn).length };
 }
 
 export function findGroup(store, nameOrId) {

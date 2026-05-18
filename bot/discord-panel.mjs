@@ -14,8 +14,14 @@ import {
   loadStore,
   storeSummary,
 } from '../api/lib/wallet-store.mjs';
+import { loadTradeSettings } from '../api/lib/trade-settings.mjs';
+import {
+  fetchTradeWalletBalances,
+  formatHomeWalletsBlock,
+} from '../api/lib/wallet-balances.mjs';
 import { renderTradeScreen } from './discord-trade-panel.mjs';
 import { renderSnipeScreen } from './discord-snipe-panel.mjs';
+import { buildAlertsLivePanel } from './discord-alerts-panel.mjs';
 
 const PANEL_COLOR = 0x5865f2;
 
@@ -32,11 +38,13 @@ export const CID = {
   GR_RESUME: 'bt:gr:resume',
   STATUS: 'bt:status',
   SETTINGS: 'bt:settings',
+  ALERTS_LIVE: 'bt:alerts:live',
   TRADING: 'bt:trade',
   TEST: 'bt:test',
   EXPORT: 'bt:export',
   IMPORT: 'bt:import',
   REFRESH: 'bt:refresh',
+  HOME_BAL: 'bt:home:bal',
   SEL_RM_WL: 'bt:sel:rmwl',
   SEL_PAUSE: 'bt:sel:pause',
   SEL_RESUME: 'bt:sel:resume',
@@ -46,9 +54,8 @@ export const CID = {
 };
 
 function btn(id, label, emoji) {
-  const b = new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(ButtonStyle.Secondary);
-  if (emoji) b.setEmoji(emoji);
-  return b;
+  const text = emoji ? `${emoji} ${label}` : label;
+  return new ButtonBuilder().setCustomId(id).setLabel(text.slice(0, 80)).setStyle(ButtonStyle.Secondary);
 }
 
 function row(...buttons) {
@@ -63,26 +70,30 @@ function panelEmbed(title, description) {
   return new EmbedBuilder().setColor(PANEL_COLOR).setTitle(title).setDescription(description);
 }
 
-export function buildHomePanel(heliusCount) {
-  const sum = storeSummary();
+export async function buildHomePanel() {
+  const balances = await fetchTradeWalletBalances();
+  const s = loadTradeSettings();
+  const walletBlock = formatHomeWalletsBlock(balances, s.enabledWalletIds);
+
   const embed = panelEmbed(
     '◈ Bundle Tracker',
     [
       '**Menu principal** — tout se fait avec les boutons.',
       '',
-      `▶ **${sum.activeCount}** wallet(s) actifs`,
-      `📁 **${loadStore().groups.length}** groupe(s)`,
-      `🔑 **${heliusCount}** clé(s) Helius`,
-      '',
-      '_Les achats apparaissent dans ce salon (messages séparés)._',
+      '**👛 Tes wallets**',
+      walletBlock.slice(0, 3500),
     ].join('\n'),
-  ).setFooter({ text: 'Alertes optimisées · WS Helius + poll secours' });
+  );
 
   return {
     embeds: [embed],
     components: [
       row(btn(CID.WALLETS, 'Wallets', '👛'), btn(CID.GROUPS, 'Groupes', '📁')),
-      row(btn(CID.STATUS, 'Statut', '📊'), btn(CID.SETTINGS, 'Paramètres', '⚙️')),
+      row(
+        btn(CID.STATUS, 'Statut', '📊'),
+        btn(CID.SETTINGS, 'Paramètres', '⚙️'),
+        btn(CID.HOME_BAL, 'Rafraîchir soldes', '🔄'),
+      ),
     ],
   };
 }
@@ -240,6 +251,7 @@ export function buildSettingsPanel(heliusCount) {
   const embed = panelEmbed(
     '⚙️ Paramètres',
     [
+      '**Alertes live** — ON/OFF par wallet surveillé',
       '**Trading** — achat/vente Jupiter depuis les alertes',
       '**Test alerte** — fausse notif dans ce salon',
       '**Actualiser** — relance la surveillance des wallets',
@@ -254,6 +266,7 @@ export function buildSettingsPanel(heliusCount) {
   return {
     embeds: [embed],
     components: [
+      row(btn(CID.ALERTS_LIVE, 'Alertes live', '🔔')),
       row(btn(CID.TRADING, 'Trading Buy/Sell', '💹')),
       row(btn(CID.TEST, 'Test alerte', '🧪'), btn(CID.REFRESH, 'Actualiser', '🔄')),
       row(backHome()),
@@ -342,6 +355,8 @@ export function resolveScreen(customId) {
       return 'home';
     case CID.REFRESH:
       return 'settings';
+    case CID.HOME_BAL:
+      return 'home';
     case CID.WALLETS:
       return 'wallets';
     case CID.WL_LIST:
@@ -362,6 +377,8 @@ export function resolveScreen(customId) {
       return 'settings';
     case CID.TRADING:
       return 'trading';
+    case CID.ALERTS_LIVE:
+      return 'alerts_live';
     default:
       return null;
   }
@@ -370,7 +387,7 @@ export function resolveScreen(customId) {
 export async function renderScreen(screen, ctx) {
   switch (screen) {
     case 'home':
-      return buildHomePanel(ctx.heliusCount);
+      return await buildHomePanel();
     case 'wallets':
       return buildWalletsMenu();
     case 'wl_list':
@@ -393,7 +410,9 @@ export async function renderScreen(screen, ctx) {
       return await renderTradeScreen('trade');
     case 'sniping':
       return await renderSnipeScreen('snipe');
+    case 'alerts_live':
+      return buildAlertsLivePanel(0);
     default:
-      return buildHomePanel(ctx.heliusCount);
+      return await buildHomePanel();
   }
 }

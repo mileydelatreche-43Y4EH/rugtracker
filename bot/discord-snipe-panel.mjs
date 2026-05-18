@@ -30,10 +30,8 @@ export const SCID = {
   MODAL_MC: 'bt:modal:snipemc:',
 };
 
-function sbtn(id, label, style = ButtonStyle.Secondary, emoji) {
-  const b = new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
-  if (emoji) b.setEmoji(emoji);
-  return b;
+function sbtn(id, label, style = ButtonStyle.Secondary) {
+  return new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
 }
 
 function srow(...buttons) {
@@ -58,8 +56,8 @@ export async function buildSnipeMenu() {
   );
 
   const components = [
-    srow(sbtn(SCID.ADD, 'Ajouter wallet', ButtonStyle.Success, '➕')),
-    srow(sbtn(SCID.BACK_TRADE, 'Retour trading', ButtonStyle.Secondary, '◀')),
+    srow(sbtn(SCID.ADD, '➕ Ajouter wallet', ButtonStyle.Success)),
+    srow(sbtn(SCID.BACK_TRADE, '◀ Retour trading')),
   ];
 
   const snipes = listSnipes();
@@ -111,7 +109,7 @@ export function buildSnipeAddSelect() {
       : '_Tous les wallets actifs sont déjà en sniping, ou aucun wallet surveillé._',
   );
 
-  const components = [srow(sbtn(SCID.MENU, 'Retour sniping', ButtonStyle.Secondary, '◀'))];
+  const components = [srow(sbtn(SCID.MENU, '◀ Retour sniping'))];
   if (candidates.length) {
     components.unshift(
       new ActionRowBuilder().addComponents(
@@ -166,10 +164,10 @@ export function buildSnipeConfigPanel(watchAddr) {
     components: [
       srow(sbtn(`bt:snipe:tog:${watchAddr}`, toggleLabel, toggleStyle)),
       srow(
-        sbtn(`bt:snipe:sol:${watchAddr}`, 'Montant SOL', ButtonStyle.Secondary, '💰'),
-        sbtn(`bt:snipe:mc:${watchAddr}`, 'Filtre MC', ButtonStyle.Secondary, '📊'),
+        sbtn(`bt:snipe:sol:${watchAddr}`, '💰 Montant SOL'),
+        sbtn(`bt:snipe:mc:${watchAddr}`, '📊 Filtre MC'),
       ),
-      srow(sbtn(SCID.MENU, 'Retour liste', ButtonStyle.Secondary, '◀')),
+      srow(sbtn(SCID.MENU, '◀ Retour liste')),
     ],
   };
 }

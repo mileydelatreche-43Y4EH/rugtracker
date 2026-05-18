@@ -68,35 +68,30 @@ export function buildTradeButtonRows(mint) {
     ...buys.map((sol, i) =>
       new ButtonBuilder()
         .setCustomId(tradeBuyId(m, i))
-        .setLabel(`Buy ${formatSolLabel(sol)}`.slice(0, 80))
-        .setStyle(ButtonStyle.Success)
-        .setEmoji('🟢'),
+        .setLabel(`🟢 Buy ${formatSolLabel(sol)}`.slice(0, 80))
+        .setStyle(ButtonStyle.Success),
     ),
     new ButtonBuilder()
       .setCustomId(tradeCustomBuyId(m))
-      .setLabel('Buy…')
-      .setStyle(ButtonStyle.Secondary)
-      .setEmoji('✏️'),
+      .setLabel('✏️ Buy…')
+      .setStyle(ButtonStyle.Secondary),
   );
 
   const rowSell = new ActionRowBuilder().addComponents(
     ...sells.map((pct, i) =>
       new ButtonBuilder()
         .setCustomId(tradeSellId(m, i))
-        .setLabel(`Sell ${pct}%`)
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji('🔴'),
+        .setLabel(`🔴 Sell ${pct}%`)
+        .setStyle(ButtonStyle.Danger),
     ),
     new ButtonBuilder()
       .setCustomId(tradeMultiId(m))
-      .setLabel('Multi-buy')
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji('👛'),
+      .setLabel('👛 Multi-buy')
+      .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId(tradeCustomSellId(m))
-      .setLabel('Sell…')
-      .setStyle(ButtonStyle.Secondary)
-      .setEmoji('✏️'),
+      .setLabel('✏️ Sell…')
+      .setStyle(ButtonStyle.Secondary),
   );
 
   return [rowBuy, rowSell];

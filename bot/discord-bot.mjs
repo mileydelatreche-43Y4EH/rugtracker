@@ -54,6 +54,12 @@ import {
   isSnipePanelId,
   isSnipeModalId,
 } from './discord-snipe-handlers.mjs';
+import { dismissEphemeral, showEphemeralError } from './discord-ui.mjs';
+import { clearBalanceCache } from '../api/lib/wallet-balances.mjs';
+import {
+  handleAlertsPanelButton,
+  isAlertsPanelId,
+} from './discord-alerts-handlers.mjs';
 
 function loadEnvFile() {
   const p = new URL('../.env', import.meta.url);
@@ -187,6 +193,10 @@ async function deny(interaction) {
 async function handleButton(interaction) {
   const id = interaction.customId;
 
+  if (isAlertsPanelId(id)) {
+    if (await handleAlertsPanelButton(interaction)) return;
+  }
+
   if (isSnipePanelId(id)) {
     if (await handleSnipePanelButton(interaction)) return;
   }
@@ -212,12 +222,10 @@ async function handleButton(interaction) {
     await interaction.deferReply({ ephemeral: true });
     try {
       await sendTestAlert();
-      await interaction.editReply({ content: '✅ Alerte test envoyée dans ce salon.' });
+      await dismissEphemeral(interaction);
     } catch (e) {
       console.error('Test alerte', e);
-      await interaction.editReply({
-        content: `❌ **Test alerte échoué**\n${e.message || e}`,
-      });
+      await showEphemeralError(interaction, `Test alerte : ${e.message || e}`);
     }
     return;
   }
@@ -234,13 +242,28 @@ async function handleButton(interaction) {
   if (id === CID.REFRESH) {
     if (workerHandle) void workerHandle.resync();
     await interaction.update(await renderScreen('settings', uiCtx()));
-    await interaction.followUp({ content: '🔄 Surveillance actualisée.', ephemeral: true });
+    return;
+  }
+
+  if (id === CID.HOME_BAL) {
+    clearBalanceCache();
+    try {
+      await interaction.update(await renderScreen('home', uiCtx()));
+    } catch (e) {
+      console.error('Rafraîchir soldes', e);
+      await showEphemeralError(interaction, e.message || String(e));
+    }
     return;
   }
 
   const screen = resolveScreen(id);
   if (screen) {
-    await interaction.update(await renderScreen(screen, uiCtx()));
+    try {
+      await interaction.update(await renderScreen(screen, uiCtx()));
+    } catch (e) {
+      console.error('Panneau', id, e);
+      await showEphemeralError(interaction, e.message || String(e));
+    }
   }
 }
 
@@ -254,32 +277,18 @@ async function handleSelect(interaction) {
   if (id === CID.SEL_RM_WL) {
     removeWallet(value);
     await interaction.update(buildWalletRemoveSelect());
-    await interaction.followUp({
-      content: `🗑 Wallet retiré : \`${value.slice(0, 8)}…\``,
-      ephemeral: true,
-    });
     return;
   }
 
   if (id === CID.SEL_PAUSE) {
-    const g = loadStore().groups.find(x => x.id === value);
     setGroupActive(value, false);
     await interaction.update(await renderScreen('gr_pause', uiCtx()));
-    await interaction.followUp({
-      content: `⏸ Groupe **${g?.name || value}** en pause.`,
-      ephemeral: true,
-    });
     return;
   }
 
   if (id === CID.SEL_RESUME) {
-    const g = loadStore().groups.find(x => x.id === value);
     setGroupActive(value, true);
     await interaction.update(await renderScreen('gr_resume', uiCtx()));
-    await interaction.followUp({
-      content: `▶ Groupe **${g?.name || value}** actif.`,
-      ephemeral: true,
-    });
   }
 }
 
@@ -300,12 +309,9 @@ async function handleModal(interaction) {
       const label = interaction.fields.getTextInputValue('label').trim();
       const group = interaction.fields.getTextInputValue('group').trim();
       if (!label) throw new Error('Nom affiché obligatoire.');
-      const store = addWallet(addr, label, group || undefined);
-      const g = findGroup(store, group) || store.groups.find(x => x.wallets.some(w => w.addr === addr));
-      await interaction.editReply({
-        content: `✅ **${label}** ajouté dans **${g?.name || 'groupe'}** (\`${addr.slice(0, 8)}…\`). Surveillance relancée.`,
-      });
+      addWallet(addr, label, group || undefined);
       void updatePanel('wallets').catch(e => console.warn('updatePanel', e.message));
+      await dismissEphemeral(interaction);
       return;
     }
 
@@ -314,8 +320,8 @@ async function handleModal(interaction) {
       const emoji = interaction.fields.getTextInputValue('emoji').trim() || '🎯';
       if (!name) throw new Error('Nom du groupe obligatoire.');
       addGroup(name, emoji);
-      await interaction.editReply({ content: `✅ Groupe **${name}** créé.` });
       void updatePanel('groups').catch(() => {});
+      await dismissEphemeral(interaction);
       return;
     }
 
@@ -329,14 +335,11 @@ async function handleModal(interaction) {
       }
       const payload = data.groups ? data : { groups: data };
       importBackup(payload);
-      const sum = storeSummary();
-      await interaction.editReply({
-        content: `✅ Import OK — **${sum.activeCount}** wallet(s) actif(s). Surveillance relancée.`,
-      });
       void updatePanel('home').catch(() => {});
+      await dismissEphemeral(interaction);
     }
   } catch (e) {
-    await interaction.editReply({ content: `❌ ${e.message || e}` }).catch(() => {});
+    await showEphemeralError(interaction, e.message || String(e));
   }
 }
 
@@ -424,7 +427,7 @@ async function handleInteraction(interaction) {
 }
 
 async function setupPanel() {
-  const payload = buildHomePanel(HELIUS_KEYS.length);
+  const payload = await buildHomePanel();
 
   if (PANEL_MESSAGE_ID) {
     try {

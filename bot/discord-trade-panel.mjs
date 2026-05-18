@@ -55,10 +55,8 @@ export const TCID = {
   MODAL_CUSTOM_SELL: 'bt:modal:trcs:',
 };
 
-function tbtn(id, label, style = ButtonStyle.Secondary, emoji) {
-  const b = new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
-  if (emoji) b.setEmoji(emoji);
-  return b;
+function tbtn(id, label, style = ButtonStyle.Secondary) {
+  return new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
 }
 
 function trow(...buttons) {
@@ -96,24 +94,23 @@ export async function buildTradeMenu() {
     components: [
       trow(tbtn(TCID.TOGGLE, onOff, onStyle)),
       trow(
-        tbtn(TCID.BUY_PRESETS, 'Montants achat SOL', ButtonStyle.Secondary, '💰'),
-        tbtn(TCID.SELL_PRESETS, 'Montants vente %', ButtonStyle.Secondary, '📉'),
-        tbtn(TCID.SLIP, 'Slippage', ButtonStyle.Secondary, '〰️'),
+        tbtn(TCID.BUY_PRESETS, '💰 Montants achat'),
+        tbtn(TCID.SELL_PRESETS, '📉 Montants vente'),
+        tbtn(TCID.SLIP, 'Slippage'),
       ),
       trow(
-        tbtn(TCID.PRIO, prioBtnLabel, ButtonStyle.Secondary, '⚡'),
-        tbtn(TCID.PRIO_CUSTOM, 'Fee custom SOL', ButtonStyle.Secondary, '✏️'),
-        tbtn(TCID.MULTI, `Multi: ${s.multiWalletMode}`, ButtonStyle.Secondary, '👛'),
+        tbtn(TCID.PRIO, `⚡ ${prioBtnLabel}`),
+        tbtn(TCID.PRIO_CUSTOM, 'Fee custom SOL'),
+        tbtn(TCID.MULTI, `Multi: ${s.multiWalletMode}`),
+        tbtn(TCID.RESERVE, `Réserve ${formatSolLabel(s.minSolReserve)}`),
       ),
       trow(
-        tbtn(TCID.RESERVE, `Réserve ${formatSolLabel(s.minSolReserve)}`, ButtonStyle.Secondary, '🛡️'),
-        tbtn(TCID.REFRESH_BAL, 'Rafraîchir soldes', ButtonStyle.Secondary, '🔄'),
+        tbtn(TCID.REFRESH_BAL, 'Rafraîchir soldes'),
+        tbtn(TCID.WALLETS, 'Wallets trading', ButtonStyle.Primary),
+        tbtn(TCID.BTNS, s.showTradeButtonsOnAlerts ? 'Masquer boutons alerte' : 'Afficher boutons alerte'),
+        tbtn(TCID.SNIPE, '🎯 Sniping wallets', ButtonStyle.Primary),
+        tbtn('bt:settings', '◀ Paramètres'),
       ),
-      trow(
-        tbtn(TCID.WALLETS, 'Wallets trading', ButtonStyle.Primary, '🔑'),
-        tbtn(TCID.BTNS, s.showTradeButtonsOnAlerts ? 'Masquer boutons' : 'Afficher boutons', ButtonStyle.Secondary, '🔘'),
-      ),
-      trow(tbtn(TCID.SNIPE, 'Sniping wallets', ButtonStyle.Primary, '🎯'), tbtn('bt:settings', 'Retour paramètres', ButtonStyle.Secondary, '◀')),
     ],
   };
 }
@@ -138,8 +135,8 @@ export async function buildTradeWalletsPanel() {
   );
 
   const components = [
-    trow(tbtn(TCID.WL_ADD, 'Ajouter clé', ButtonStyle.Success, '➕'), tbtn(TCID.WL_RM, 'Retirer', ButtonStyle.Danger, '➖')),
-    trow(tbtn(TCID.MENU, 'Retour trading', ButtonStyle.Secondary, '◀')),
+    trow(tbtn(TCID.WL_ADD, '➕ Ajouter clé', ButtonStyle.Success), tbtn(TCID.WL_RM, '➖ Retirer')),
+    trow(tbtn(TCID.MENU, '◀ Retour trading')),
   ];
 
   if (balances.length) {
