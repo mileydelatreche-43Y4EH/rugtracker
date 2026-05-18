@@ -7,8 +7,11 @@ import {
   buildBuyEmbed,
   buildBuyButtons,
   buildBuyLinks,
+  buildAlertMenuComponents,
   COPY_CA_PREFIX,
+  ALERT_MENU_PREFIX,
 } from '../api/lib/discord-alert.mjs';
+import { getAlertContext } from '../api/lib/alert-context.mjs';
 import { notifyBuyAlert } from '../api/lib/notify-buy.mjs';
 import {
   addWallet,
@@ -33,6 +36,16 @@ import {
   buildHomePanel,
   buildWalletRemoveSelect,
 } from './discord-panel.mjs';
+import { isTradeButtonId } from '../api/lib/discord-trade.mjs';
+import { loadTradeSettings } from '../api/lib/trade-settings.mjs';
+import {
+  handleTradePanelButton,
+  handleTradePanelSelect,
+  handleTradeAlertButton,
+  handleTradeModal,
+  isTradePanelId,
+  isTradeModalId,
+} from './discord-trade-handlers.mjs';
 
 function loadEnvFile() {
   const p = new URL('../.env', import.meta.url);
@@ -89,6 +102,7 @@ if (!TOKEN || !CLIENT_ID || !CHANNEL_ID) {
 if (!HELIUS_KEYS.length) process.exit(1);
 
 loadStore();
+loadTradeSettings();
 
 const uiCtx = () => ({ heliusCount: HELIUS_KEYS.length, channelId: CHANNEL_ID });
 
@@ -127,9 +141,10 @@ async function sendTestAlert() {
   };
   const hit = { mint: '7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr', sol: 0.1, venue: 'curve' };
   const meta = {
-    sym: 'TEST',
-    name: 'Token démo',
-    imageUrl: '',
+    sym: 'POPCAT',
+    name: 'Popcat',
+    imageUrl:
+      'https://dd.dexscreener.com/ds-data/tokens/solana/7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr.png',
     mcUsd: 42000,
     pairAddress: '',
     snap: {},
@@ -151,6 +166,10 @@ async function deny(interaction) {
 
 async function handleButton(interaction) {
   const id = interaction.customId;
+
+  if (isTradePanelId(id)) {
+    if (await handleTradePanelButton(interaction)) return;
+  }
 
   if (id === CID.WL_ADD) {
     await interaction.showModal(walletAddModal());
@@ -198,6 +217,8 @@ async function handleSelect(interaction) {
   const id = interaction.customId;
   const value = interaction.values[0];
 
+  if (await handleTradePanelSelect(interaction)) return;
+
   if (id === CID.SEL_RM_WL) {
     removeWallet(value);
     await interaction.update(buildWalletRemoveSelect());
@@ -231,6 +252,10 @@ async function handleSelect(interaction) {
 }
 
 async function handleModal(interaction) {
+  if (isTradeModalId(interaction.customId)) {
+    if (await handleTradeModal(interaction)) return;
+  }
+
   await interaction.deferReply({ ephemeral: true });
 
   try {
@@ -280,12 +305,45 @@ async function handleModal(interaction) {
 }
 
 async function handleInteraction(interaction) {
+  if (interaction.isButton() && interaction.customId?.startsWith(ALERT_MENU_PREFIX)) {
+    const mint = interaction.customId.slice(ALERT_MENU_PREFIX.length);
+    const ctx = getAlertContext(mint);
+    const links = ctx?.links || buildBuyLinks(mint, ctx?.sig || '', '');
+    const title = ctx?.sym
+      ? `☰ **${String(ctx.sym).toUpperCase()}**${ctx.name ? ` — ${ctx.name}` : ''}`
+      : '☰ Menu token';
+    await interaction.reply({
+      content: `${title}\n\`${mint}\``,
+      components: buildAlertMenuComponents(links, mint),
+      ephemeral: true,
+    });
+    return;
+  }
+
   if (interaction.isButton() && interaction.customId?.startsWith(COPY_CA_PREFIX)) {
     const mint = interaction.customId.slice(COPY_CA_PREFIX.length);
     await interaction.reply({
       content: `**Contrat (CA)**\n\`\`\`\n${mint}\n\`\`\``,
       ephemeral: true,
     });
+    return;
+  }
+
+  if (interaction.isButton() && isTradeButtonId(interaction.customId)) {
+    if (!isAdmin(interaction.user.id)) {
+      await deny(interaction);
+      return;
+    }
+    try {
+      await handleTradeAlertButton(interaction);
+    } catch (e) {
+      const msg = e.message || String(e);
+      if (interaction.deferred) {
+        await interaction.editReply({ content: `❌ ${msg}` }).catch(() => {});
+      } else {
+        await interaction.reply({ content: `❌ ${msg}`, ephemeral: true }).catch(() => {});
+      }
+    }
     return;
   }
 

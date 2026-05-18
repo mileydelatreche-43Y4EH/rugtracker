@@ -3,6 +3,8 @@ import { sendDiscordBuyAlert } from './discord-alert.mjs';
 import { sendWebhookBuyAlert } from './discord-webhook.mjs';
 import { notifyBuyFast } from './notify-fast.mjs';
 import { fetchTokenMetaFast } from './token-meta.mjs';
+import { maybeAutoBuy } from './trade-executor.mjs';
+import { loadTradeSettings } from './trade-settings.mjs';
 
 const META_TIMEOUT_MS = Number(process.env.NTFY_META_TIMEOUT_MS || 850);
 
@@ -39,6 +41,16 @@ export async function notifyBuyAlert(ctx, w, hit, sig, rpcCall, walletIndex = 0)
     console.log(
       `💬 Discord → ${w.label} · ${meta.sym} · ${w.groupName || ''}`,
     );
+    const s = loadTradeSettings();
+    if (s.tradingEnabled && s.autoBuy?.enabled) {
+      void maybeAutoBuy(hit, meta).then(r => {
+        if (r?.text) {
+          ctx.discordChannel
+            .send({ content: `🤖 **Auto-buy** · ${meta.sym}\n${r.text}` })
+            .catch(e => console.warn('auto-buy msg', e.message));
+        }
+      });
+    }
   } else if (ctx.webhookUrl) {
     await sendWebhookBuyAlert(ctx.webhookUrl, { w, hit, meta, sig, axiomUrl });
     console.log(

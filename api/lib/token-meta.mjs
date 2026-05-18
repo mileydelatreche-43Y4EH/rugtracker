@@ -1,3 +1,12 @@
+/** URL image token (meta → DexScreener → Pump.fun). */
+export function resolveTokenImageUrl(mint, meta = {}) {
+  const direct = String(meta.imageUrl || '').trim();
+  if (direct.startsWith('http')) return direct;
+  const m = String(mint || '').trim();
+  if (!m) return '';
+  return `https://dd.dexscreener.com/ds-data/tokens/solana/${m}.png`;
+}
+
 export function fmtU(n) {
   const x = Number(n) || 0;
   if (x <= 0) return '—';

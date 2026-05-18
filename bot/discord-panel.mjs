@@ -14,6 +14,7 @@ import {
   loadStore,
   storeSummary,
 } from '../api/lib/wallet-store.mjs';
+import { renderTradeScreen } from './discord-trade-panel.mjs';
 
 const PANEL_COLOR = 0x5865f2;
 
@@ -30,6 +31,7 @@ export const CID = {
   GR_RESUME: 'bt:gr:resume',
   STATUS: 'bt:status',
   SETTINGS: 'bt:settings',
+  TRADING: 'bt:trade',
   TEST: 'bt:test',
   EXPORT: 'bt:export',
   IMPORT: 'bt:import',
@@ -237,6 +239,7 @@ export function buildSettingsPanel(heliusCount) {
   const embed = panelEmbed(
     '⚙️ Paramètres',
     [
+      '**Trading** — achat/vente Jupiter depuis les alertes',
       '**Test alerte** — fausse notif dans ce salon',
       '**Actualiser** — relance la surveillance des wallets',
       '',
@@ -250,6 +253,7 @@ export function buildSettingsPanel(heliusCount) {
   return {
     embeds: [embed],
     components: [
+      row(btn(CID.TRADING, 'Trading Buy/Sell', '💹')),
       row(btn(CID.TEST, 'Test alerte', '🧪'), btn(CID.REFRESH, 'Actualiser', '🔄')),
       row(backHome()),
     ],
@@ -355,6 +359,8 @@ export function resolveScreen(customId) {
       return 'status';
     case CID.SETTINGS:
       return 'settings';
+    case CID.TRADING:
+      return 'trading';
     default:
       return null;
   }
@@ -382,6 +388,8 @@ export function renderScreen(screen, ctx) {
       return buildStatusPanel(ctx.heliusCount, ctx.channelId);
     case 'settings':
       return buildSettingsPanel(ctx.heliusCount);
+    case 'trading':
+      return renderTradeScreen('trade');
     default:
       return buildHomePanel(ctx.heliusCount);
   }

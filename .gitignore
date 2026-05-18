@@ -1,4 +1,6 @@
 node_modules/
+data/trade-wallets.json
+data/trade-settings.json
 dist/
 .env
 .env.*
