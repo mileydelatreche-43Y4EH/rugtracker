@@ -16,14 +16,13 @@ export function solToLamports(sol) {
   return Math.round(Number(sol) * LAMPORTS_PER_SOL);
 }
 
-/** Affiche un montant SOL lisible (ex. 0.1 SOL). */
+/** Affiche un montant SOL lisible (ex. 0.1). */
 export function formatSolAmount(sol) {
   const n = Number(sol) || 0;
-  if (n >= 10) return n.toFixed(2);
-  if (n >= 1) return n.toFixed(3);
-  if (n >= 0.01) return n.toFixed(4);
-  if (n >= 0.0001) return n.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
-  return n.toFixed(9).replace(/0+$/, '').replace(/\.$/, '') || '0';
+  if (n >= 10) return String(Number(n.toFixed(2)));
+  if (n >= 1) return String(Number(n.toFixed(3)));
+  if (n >= 0.01) return String(Number(n.toFixed(2)));
+  return String(Number(n.toFixed(4)));
 }
 
 export function formatSolLabel(sol) {

@@ -19,12 +19,11 @@ import {
   tradeSlipModal,
   tradePrioModal,
   tradeWalletAddModal,
-  tradeAutoSolModal,
-  tradeAutoMcModal,
   tradeReserveModal,
   tradeCustomBuyModal,
   tradeCustomSellModal,
 } from './discord-trade-panel.mjs';
+import { renderSnipeScreen } from './discord-snipe-panel.mjs';
 
 async function updateTradeScreen(interaction, screen) {
   await interaction.deferUpdate();
@@ -34,6 +33,12 @@ async function updateTradeScreen(interaction, screen) {
 
 export async function handleTradePanelButton(interaction) {
   const id = interaction.customId;
+
+  if (id === TCID.SNIPE) {
+    await interaction.deferUpdate();
+    await interaction.editReply(await renderSnipeScreen('snipe'));
+    return true;
+  }
 
   if (id === TCID.TOGGLE) {
     const s = loadTradeSettings();
@@ -84,14 +89,6 @@ export async function handleTradePanelButton(interaction) {
     await interaction.showModal(tradeWalletAddModal());
     return true;
   }
-  if (id === TCID.AUTO_SOL) {
-    await interaction.showModal(tradeAutoSolModal());
-    return true;
-  }
-  if (id === TCID.AUTO_MC) {
-    await interaction.showModal(tradeAutoMcModal());
-    return true;
-  }
   if (id === TCID.RESERVE) {
     await interaction.showModal(tradeReserveModal());
     return true;
@@ -101,13 +98,6 @@ export async function handleTradePanelButton(interaction) {
     const mode = cycleMultiWalletMode();
     await updateTradeScreen(interaction, 'trade');
     await interaction.followUp({ content: `👛 Mode multi-wallet : **${mode}**`, ephemeral: true });
-    return true;
-  }
-
-  if (id === TCID.AUTO_TOGGLE) {
-    const s = loadTradeSettings();
-    patchTradeSettings({ autoBuy: { ...s.autoBuy, enabled: !s.autoBuy.enabled } });
-    await interaction.update(await renderTradeScreen('trade_auto'));
     return true;
   }
 
@@ -123,11 +113,6 @@ export async function handleTradePanelButton(interaction) {
     await interaction.update(await renderTradeScreen('trade_wl_rm'));
     return true;
   }
-  if (id === TCID.AUTO) {
-    await interaction.update(await renderTradeScreen('trade_auto'));
-    return true;
-  }
-
   return false;
 }
 
@@ -276,21 +261,6 @@ export async function handleTradeModal(interaction) {
       });
       return true;
     }
-    if (cid === TCID.MODAL_AUTO_SOL) {
-      const sol = parseFloat(interaction.fields.getTextInputValue('sol'));
-      const s = loadTradeSettings();
-      patchTradeSettings({ autoBuy: { ...s.autoBuy, solAmount: sol } });
-      await interaction.editReply({ content: `✅ Auto-buy : ${formatSolLabel(sol)}` });
-      return true;
-    }
-    if (cid === TCID.MODAL_AUTO_MC) {
-      const min = parseFloat(interaction.fields.getTextInputValue('min'));
-      const max = parseFloat(interaction.fields.getTextInputValue('max'));
-      const s = loadTradeSettings();
-      patchTradeSettings({ autoBuy: { ...s.autoBuy, minMcUsd: min, maxMcUsd: max } });
-      await interaction.editReply({ content: `✅ MC auto-buy : ${min} – ${max} USD` });
-      return true;
-    }
     if (cid === TCID.MODAL_RESERVE) {
       const sol = parseFloat(interaction.fields.getTextInputValue('sol'));
       patchTradeSettings({ minSolReserve: sol });
@@ -306,7 +276,7 @@ export async function handleTradeModal(interaction) {
 }
 
 export function isTradePanelId(id) {
-  return id === TCID.MENU || id?.startsWith('bt:trade:') || id === 'bt:trade';
+  return id === TCID.MENU || id === 'bt:trade' || id?.startsWith('bt:trade:');
 }
 
 export function isTradeModalId(id) {

@@ -1,10 +1,11 @@
 import { Connection } from '@solana/web3.js';
 import { loadTradeSettings } from './trade-settings.mjs';
+import { getSnipeByAddr } from './snipe-settings.mjs';
 import { getSigningWallets } from './trade-wallets.mjs';
 import { getSolBalance, swapSolToToken, swapTokenToSol } from './jupiter-swap.mjs';
 import { primaryHeliusRpcUrl } from './helius-rpc.mjs';
 
-const autoBuySeen = new Map();
+const snipeBuySeen = new Map();
 
 function pickWallets(settings, all) {
   if (!all.length) throw new Error('Aucun wallet de trading configuré (TRADE_WALLETS_PATH ou TRADE_WALLETS_JSON).');
@@ -95,30 +96,36 @@ export async function executeSellTrade({ mint, sellPct, settings: sIn, rpcUrl: r
   return formatTradeResults(results, `vente **${pct}%**`);
 }
 
-/** Auto-buy après alerte (si configuré). */
-export async function maybeAutoBuy(hit, meta) {
+/** Snipe auto-buy quand un wallet surveillé achète (config par wallet). */
+export async function maybeSnipeBuy(watchedWallet, hit, meta) {
   const settings = loadTradeSettings();
-  const ab = settings.autoBuy;
-  if (!settings.tradingEnabled || !ab?.enabled) return null;
+  if (!settings.tradingEnabled) return null;
 
+  const snipe = getSnipeByAddr(watchedWallet?.addr, settings);
+  if (!snipe?.autoBuy?.enabled) return null;
+
+  const ab = snipe.autoBuy;
   const mc = Number(meta?.mcUsd) || 0;
   if (ab.minMcUsd > 0 && mc < ab.minMcUsd) return null;
   if (ab.maxMcUsd > 0 && mc > ab.maxMcUsd) return null;
   if (ab.venues?.length && !ab.venues.includes(hit.venue)) return null;
 
   const mint = hit.mint;
-  const count = autoBuySeen.get(mint) || 0;
+  const seenKey = `${snipe.watchAddr}:${mint}`;
+  const count = snipeBuySeen.get(seenKey) || 0;
   if (count >= (ab.maxPerMint || 1)) return null;
-  autoBuySeen.set(mint, count + 1);
-  if (autoBuySeen.size > 500) {
-    const k = autoBuySeen.keys().next().value;
-    autoBuySeen.delete(k);
+  snipeBuySeen.set(seenKey, count + 1);
+  if (snipeBuySeen.size > 800) {
+    const k = snipeBuySeen.keys().next().value;
+    snipeBuySeen.delete(k);
   }
 
+  const label = watchedWallet.label || snipe.watchAddr.slice(0, 8);
   try {
-    return await executeBuyTrade({ mint, solAmount: ab.solAmount, settings });
+    const result = await executeBuyTrade({ mint, solAmount: ab.solAmount, settings });
+    return { ...result, snipeLabel: label };
   } catch (e) {
-    console.warn('auto-buy', mint.slice(0, 8), e.message);
-    return { text: `❌ Auto-buy : ${e.message}`, ok: 0, total: 0 };
+    console.warn('snipe-buy', label, mint.slice(0, 8), e.message);
+    return { text: `❌ Snipe **${label}** : ${e.message}`, ok: 0, total: 0, snipeLabel: label };
   }
 }

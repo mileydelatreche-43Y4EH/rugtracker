@@ -4,13 +4,14 @@
 import { readFileSync, existsSync } from 'fs';
 import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
 import {
-  buildBuyEmbed,
-  buildBuyButtons,
   buildBuyLinks,
   buildAlertMenuComponents,
+  sendDiscordBuyAlert,
   COPY_CA_PREFIX,
   ALERT_MENU_PREFIX,
 } from '../api/lib/discord-alert.mjs';
+import { fetchTokenMetaFast } from '../api/lib/token-meta.mjs';
+import { axiomTradeUrl } from '../api/lib/axiom.mjs';
 import { getAlertContext } from '../api/lib/alert-context.mjs';
 import { notifyBuyAlert } from '../api/lib/notify-buy.mjs';
 import {
@@ -46,6 +47,13 @@ import {
   isTradePanelId,
   isTradeModalId,
 } from './discord-trade-handlers.mjs';
+import {
+  handleSnipePanelButton,
+  handleSnipePanelSelect,
+  handleSnipeModal,
+  isSnipePanelId,
+  isSnipeModalId,
+} from './discord-snipe-handlers.mjs';
 
 function loadEnvFile() {
   const p = new URL('../.env', import.meta.url);
@@ -132,6 +140,8 @@ async function updatePanel(screen = 'home') {
 }
 
 async function sendTestAlert() {
+  if (!alertChannel?.send) throw new Error('Canal alertes non prêt — attends que le bot soit connecté.');
+
   const w = getActiveWallets()[0] || {
     addr: '11111111111111111111111111111111',
     label: 'Test',
@@ -140,7 +150,8 @@ async function sendTestAlert() {
     groupColor: 0x7c3aed,
   };
   const hit = { mint: '7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr', sol: 0.1, venue: 'curve' };
-  const meta = {
+
+  let meta = {
     sym: 'POPCAT',
     name: 'Popcat',
     imageUrl:
@@ -149,11 +160,20 @@ async function sendTestAlert() {
     pairAddress: '',
     snap: {},
   };
-  const links = buildBuyLinks(hit.mint, '', 'https://axiom.trade/?chain=sol');
-  await alertChannel.send({
-    embeds: [buildBuyEmbed({ w, hit, meta, sig: '' })],
-    components: buildBuyButtons(links, hit.mint),
-  });
+
+  if (workerHandle?.rpcCall) {
+    try {
+      meta = await Promise.race([
+        fetchTokenMetaFast(hit.mint, workerHandle.rpcCall, 0),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+      ]);
+    } catch {
+      /* garde meta de secours */
+    }
+  }
+
+  const axiomUrl = await axiomTradeUrl(hit.mint, meta.pairAddress).catch(() => '');
+  await sendDiscordBuyAlert(alertChannel, { w, hit, meta, sig: '', axiomUrl });
 }
 
 async function deny(interaction) {
@@ -166,6 +186,10 @@ async function deny(interaction) {
 
 async function handleButton(interaction) {
   const id = interaction.customId;
+
+  if (isSnipePanelId(id)) {
+    if (await handleSnipePanelButton(interaction)) return;
+  }
 
   if (isTradePanelId(id)) {
     if (await handleTradePanelButton(interaction)) return;
@@ -185,9 +209,16 @@ async function handleButton(interaction) {
   }
 
   if (id === CID.TEST) {
-    await interaction.deferUpdate();
-    await sendTestAlert();
-    await interaction.followUp({ content: '✅ Alerte test envoyée ci-dessus.', ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
+    try {
+      await sendTestAlert();
+      await interaction.editReply({ content: '✅ Alerte test envoyée dans ce salon.' });
+    } catch (e) {
+      console.error('Test alerte', e);
+      await interaction.editReply({
+        content: `❌ **Test alerte échoué**\n${e.message || e}`,
+      });
+    }
     return;
   }
 
@@ -217,6 +248,7 @@ async function handleSelect(interaction) {
   const id = interaction.customId;
   const value = interaction.values[0];
 
+  if (await handleSnipePanelSelect(interaction)) return;
   if (await handleTradePanelSelect(interaction)) return;
 
   if (id === CID.SEL_RM_WL) {
@@ -252,6 +284,10 @@ async function handleSelect(interaction) {
 }
 
 async function handleModal(interaction) {
+  if (isSnipeModalId(interaction.customId)) {
+    if (await handleSnipeModal(interaction)) return;
+  }
+
   if (isTradeModalId(interaction.customId)) {
     if (await handleTradeModal(interaction)) return;
   }

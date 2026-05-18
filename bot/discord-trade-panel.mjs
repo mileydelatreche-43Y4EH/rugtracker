@@ -39,10 +39,7 @@ export const TCID = {
   WALLETS: 'bt:trade:wallets',
   WL_ADD: 'bt:trade:wladd',
   WL_RM: 'bt:trade:wlrm',
-  AUTO: 'bt:trade:auto',
-  AUTO_TOGGLE: 'bt:trade:autot',
-  AUTO_SOL: 'bt:trade:autosol',
-  AUTO_MC: 'bt:trade:automc',
+  SNIPE: 'bt:trade:snipe',
   RESERVE: 'bt:trade:reserve',
   REFRESH_BAL: 'bt:trade:refreshbal',
   PRIO_CUSTOM: 'bt:trade:priocustom',
@@ -53,8 +50,6 @@ export const TCID = {
   MODAL_SLIP: 'bt:modal:trslip',
   MODAL_PRIO: 'bt:modal:trprio',
   MODAL_WL_ADD: 'bt:modal:trwladd',
-  MODAL_AUTO_SOL: 'bt:modal:trautosol',
-  MODAL_AUTO_MC: 'bt:modal:trautomc',
   MODAL_RESERVE: 'bt:modal:trreserve',
   MODAL_CUSTOM_BUY: 'bt:modal:trcb:',
   MODAL_CUSTOM_SELL: 'bt:modal:trcs:',
@@ -118,7 +113,7 @@ export async function buildTradeMenu() {
         tbtn(TCID.WALLETS, 'Wallets trading', ButtonStyle.Primary, '🔑'),
         tbtn(TCID.BTNS, s.showTradeButtonsOnAlerts ? 'Masquer boutons' : 'Afficher boutons', ButtonStyle.Secondary, '🔘'),
       ),
-      trow(tbtn(TCID.AUTO, 'Auto-buy', ButtonStyle.Secondary, '🤖'), tbtn('bt:settings', 'Retour paramètres', ButtonStyle.Secondary, '◀')),
+      trow(tbtn(TCID.SNIPE, 'Sniping wallets', ButtonStyle.Primary, '🎯'), tbtn('bt:settings', 'Retour paramètres', ButtonStyle.Secondary, '◀')),
     ],
   };
 }
@@ -168,37 +163,6 @@ export async function buildTradeWalletsPanel() {
   }
 
   return { embeds: [embed], components };
-}
-
-export function buildTradeAutoPanel() {
-  const s = loadTradeSettings();
-  const ab = s.autoBuy;
-  const embed = tradeEmbed(
-    '🤖 Auto-buy',
-    [
-      `État : **${ab.enabled ? 'ACTIVÉ' : 'désactivé'}**`,
-      `Montant : **${ab.solAmount} SOL** par alerte`,
-      `MC : **${ab.minMcUsd || 0}** – **${ab.maxMcUsd || '∞'}** USD`,
-      `Venues : ${(ab.venues || []).join(', ') || 'toutes'}`,
-      `Max achats / token : **${ab.maxPerMint || 1}**`,
-      '',
-      '_Achète automatiquement quand une alerte correspond aux filtres (nécessite Trading ON)._',
-    ].join('\n'),
-  );
-
-  return {
-    embeds: [embed],
-    components: [
-      trow(
-        tbtn(TCID.AUTO_TOGGLE, ab.enabled ? 'Désactiver auto-buy' : 'Activer auto-buy', ab.enabled ? ButtonStyle.Danger : ButtonStyle.Success),
-      ),
-      trow(
-        tbtn(TCID.AUTO_SOL, 'Montant SOL', ButtonStyle.Secondary, '💰'),
-        tbtn(TCID.AUTO_MC, 'Filtre MC', ButtonStyle.Secondary, '📊'),
-      ),
-      trow(tbtn(TCID.MENU, 'Retour trading', ButtonStyle.Secondary, '◀')),
-    ],
-  };
 }
 
 export function buildTradeWalletRemoveSelect() {
@@ -334,48 +298,6 @@ export function tradeWalletAddModal() {
     );
 }
 
-export function tradeAutoSolModal() {
-  const ab = loadTradeSettings().autoBuy;
-  return new ModalBuilder()
-    .setCustomId(TCID.MODAL_AUTO_SOL)
-    .setTitle('Auto-buy — montant SOL')
-    .addComponents(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('sol')
-          .setLabel('SOL par achat auto')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setValue(String(ab.solAmount)),
-      ),
-    );
-}
-
-export function tradeAutoMcModal() {
-  const ab = loadTradeSettings().autoBuy;
-  return new ModalBuilder()
-    .setCustomId(TCID.MODAL_AUTO_MC)
-    .setTitle('Auto-buy — filtre MC')
-    .addComponents(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('min')
-          .setLabel('MC min USD (0 = off)')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setValue(String(ab.minMcUsd || 0)),
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('max')
-          .setLabel('MC max USD')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setValue(String(ab.maxMcUsd || 250000)),
-      ),
-    );
-}
-
 export function tradeReserveModal() {
   const s = loadTradeSettings();
   return new ModalBuilder()
@@ -450,7 +372,7 @@ export function resolveTradeScreen(id) {
   if (id === TCID.MENU) return 'trade';
   if (id === TCID.WALLETS) return 'trade_wallets';
   if (id === TCID.WL_RM) return 'trade_wl_rm';
-  if (id === TCID.AUTO) return 'trade_auto';
+  if (id === TCID.SNIPE) return 'sniping';
   return null;
 }
 
@@ -462,8 +384,6 @@ export async function renderTradeScreen(screen) {
       return await buildTradeWalletsPanel();
     case 'trade_wl_rm':
       return buildTradeWalletRemoveSelect();
-    case 'trade_auto':
-      return buildTradeAutoPanel();
     default:
       return await buildTradeMenu();
   }

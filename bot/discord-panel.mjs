@@ -15,6 +15,7 @@ import {
   storeSummary,
 } from '../api/lib/wallet-store.mjs';
 import { renderTradeScreen } from './discord-trade-panel.mjs';
+import { renderSnipeScreen } from './discord-snipe-panel.mjs';
 
 const PANEL_COLOR = 0x5865f2;
 
@@ -390,6 +391,8 @@ export async function renderScreen(screen, ctx) {
       return buildSettingsPanel(ctx.heliusCount);
     case 'trading':
       return await renderTradeScreen('trade');
+    case 'sniping':
+      return await renderSnipeScreen('snipe');
     default:
       return buildHomePanel(ctx.heliusCount);
   }

@@ -18,14 +18,7 @@ export const DEFAULT_TRADE_SETTINGS = {
   multiWalletMode: 'all',
   enabledWalletIds: [],
   minSolReserve: 0.02,
-  autoBuy: {
-    enabled: false,
-    solAmount: 0.1,
-    minMcUsd: 0,
-    maxMcUsd: 250000,
-    venues: ['curve', 'pumpswap'],
-    maxPerMint: 1,
-  },
+  snipes: [],
 };
 
 const listeners = new Set();
@@ -35,7 +28,8 @@ function settingsPath() {
 }
 
 function normalize(input) {
-  const d = { ...DEFAULT_TRADE_SETTINGS, ...input, autoBuy: { ...DEFAULT_TRADE_SETTINGS.autoBuy, ...(input?.autoBuy || {}) } };
+  const d = { ...DEFAULT_TRADE_SETTINGS, ...input };
+  d.snipes = Array.isArray(d.snipes) ? d.snipes : [];
   d.buyPresetsSol = (d.buyPresetsSol || DEFAULT_TRADE_SETTINGS.buyPresetsSol)
     .map(Number)
     .filter(n => n > 0 && n <= 50)
@@ -89,10 +83,9 @@ export function onTradeSettingsChange(fn) {
 }
 
 export function tradeSettingsSummary(s = loadTradeSettings()) {
-  const auto = s.autoBuy?.enabled
-    ? `🟢 ${formatSolLabel(s.autoBuy.solAmount)}`
-    : '🔴 off';
   const prio = formatPriorityFeeAxiom(s.priorityFeeLamports);
+  const snipeCount = (s.snipes || []).length;
+  const snipeOn = (s.snipes || []).filter(x => x.autoBuy?.enabled).length;
   return [
     `Trading : **${s.tradingEnabled ? 'ON' : 'OFF'}**`,
     `Boutons alertes : **${s.showTradeButtonsOnAlerts ? 'ON' : 'OFF'}**`,
@@ -102,6 +95,6 @@ export function tradeSettingsSummary(s = loadTradeSettings()) {
     `Priority fee : ${prio.line} _(style Axiom)_`,
     `Réserve min : **${formatSolLabel(s.minSolReserve)}**`,
     `Multi-wallet : **${s.multiWalletMode}**`,
-    `Auto-buy : ${auto}`,
+    `Sniping : **${snipeOn}** actif(s) / **${snipeCount}** wallet(s)`,
   ];
 }

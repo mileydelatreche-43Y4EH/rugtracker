@@ -68,6 +68,16 @@ export function buildBuyEmbed({ w, hit, meta, sig }) {
   return embed;
 }
 
+/** Discord : max 5 lignes, 5 boutons par ligne. */
+export function clampAlertComponents(rows) {
+  return rows.slice(0, 5).map(row => {
+    const next = new ActionRowBuilder();
+    const comps = row.components?.slice(0, 5) || [];
+    if (comps.length) next.addComponents(...comps);
+    return next;
+  }).filter(r => r.components.length > 0);
+}
+
 export function buildBuyButtons(links, mint) {
   const m = String(mint || '').trim();
   const row1 = new ActionRowBuilder().addComponents(
@@ -90,7 +100,7 @@ export function buildBuyButtons(links, mint) {
   const rows = [row1, row2];
   const tradeRows = buildTradeButtonRows(m);
   if (tradeRows.length) rows.push(...tradeRows);
-  return rows;
+  return clampAlertComponents(rows);
 }
 
 export function buildAlertComponents(links, mint) {
@@ -130,7 +140,15 @@ export async function sendDiscordBuyAlert(channel, payload) {
     });
   }
   const components = buildBuyButtons(links, hit.mint);
-  return channel.send({ embeds: [embed], components });
+  try {
+    return await channel.send({ embeds: [embed], components });
+  } catch (e) {
+    const msg = String(e.message || e);
+    if (!msg.includes('COMPONENT') && !msg.includes('50035') && !msg.includes('button')) {
+      throw e;
+    }
+    return channel.send({ embeds: [embed], components: components.slice(0, 2) });
+  }
 }
 
 export async function sendDiscordPlain(channel, title, description) {
