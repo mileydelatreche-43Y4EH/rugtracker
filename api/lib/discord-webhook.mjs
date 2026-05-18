@@ -13,7 +13,7 @@ function webhookUrlWithWait(url) {
 export function buildBuyWebhookPayload({ w, hit, meta, sig, axiomUrl }) {
   const links = buildBuyLinks(hit.mint, sig, axiomUrl);
   const embed = buildBuyEmbed({ w, hit, meta, sig });
-  const components = buildBuyButtons(links);
+  const components = buildBuyButtons(links, hit.mint);
   return {
     embeds: [embed.toJSON()],
     components: components.map(r => r.toJSON()),

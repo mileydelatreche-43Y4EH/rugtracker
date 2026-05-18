@@ -49,6 +49,8 @@ function pickDexPair(pairs) {
 export async function fetchTokenMetaFast(mint, rpcCall, keyIndex = 0) {
   const symFallback = String(mint).slice(0, 8).toUpperCase();
   let sym = symFallback;
+  let name = '';
+  let imageUrl = '';
   let mcUsd = 0;
   let pairAddress = '';
   let creator = '';
@@ -68,12 +70,19 @@ export async function fetchTokenMetaFast(mint, rpcCall, keyIndex = 0) {
 
   const [dd, [hr, sr, das]] = await Promise.all([dexP, rpcP]);
 
-  if (das?.content?.metadata?.symbol) sym = das.content.metadata.symbol;
+  if (das?.content?.metadata) {
+    if (das.content.metadata.symbol) sym = das.content.metadata.symbol;
+    if (das.content.metadata.name) name = das.content.metadata.name;
+  }
+  const imgLink = das?.content?.links?.image;
+  if (imgLink && String(imgLink).startsWith('http')) imageUrl = String(imgLink);
   creator = (das?.authorities || [])[0]?.address || '';
 
   const pair = pickDexPair(dd?.pairs);
   if (pair) {
     if (pair.baseToken?.symbol && sym === symFallback) sym = pair.baseToken.symbol;
+    if (pair.baseToken?.name && !name) name = pair.baseToken.name;
+    if (pair.info?.imageUrl && !imageUrl) imageUrl = pair.info.imageUrl;
     pairAddress = pair.pairAddress || '';
     if (pair.fdv > 0) mcUsd = pair.fdv;
     else if (pair.marketCap > 0) mcUsd = pair.marketCap;
@@ -91,7 +100,7 @@ export async function fetchTokenMetaFast(mint, rpcCall, keyIndex = 0) {
     snap = calcScore(holders, ts, creator);
   } catch {}
 
-  return { sym, mcUsd, pairAddress, snap };
+  return { sym, name, imageUrl, mcUsd, pairAddress, snap };
 }
 
 export function buildPhoneNtfyPayload(w, meta, mint) {

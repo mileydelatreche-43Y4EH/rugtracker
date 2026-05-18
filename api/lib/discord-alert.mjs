@@ -6,18 +6,7 @@ import {
 } from 'discord.js';
 import { fmtU } from './token-meta.mjs';
 
-const RISK_COLOR = {
-  DANGER: 0xed4245,
-  HIGH: 0xfaa61a,
-  MEDIUM: 0xfee75c,
-  LOW: 0x57f287,
-  SAFE: 0x5865f2,
-  UNKNOWN: 0x95a5a6,
-};
-
-function riskColor(risk) {
-  return RISK_COLOR[String(risk || '').toUpperCase()] ?? RISK_COLOR.UNKNOWN;
-}
+export const COPY_CA_PREFIX = 'bt:ca:';
 
 function venueLabel(venue) {
   if (venue === 'pumpswap') return 'PumpSwap';
@@ -37,45 +26,55 @@ export function buildBuyLinks(mint, sig, axiomUrl) {
   };
 }
 
-export function buildBuyEmbed({ w, hit, meta, sig }) {
-  const sym = meta.sym || hit.mint.slice(0, 8).toUpperCase();
-  const risk = meta.snap?.risk || 'UNKNOWN';
-  const groupLine = w.groupEmoji && w.groupName ? `${w.groupEmoji} ${w.groupName}` : '—';
-  const sol = hit.sol != null ? `${Number(hit.sol).toFixed(4)} SOL` : '—';
+function linkBtn(label, url) {
+  return new ButtonBuilder().setLabel(label).setStyle(ButtonStyle.Link).setURL(url);
+}
 
-  return new EmbedBuilder()
-    .setColor(riskColor(risk))
-    .setTitle(`🎯 ${sym} — nouveau token`)
+export function buildBuyEmbed({ w, hit, meta, sig }) {
+  const sym = (meta.sym || hit.mint.slice(0, 8)).toUpperCase();
+  const tokenName = (meta.name || '').trim();
+  const title = tokenName ? `🎯 ${sym} — ${tokenName}` : `🎯 ${sym}`;
+  const groupLine = w.groupEmoji && w.groupName ? `${w.groupEmoji} ${w.groupName}` : '—';
+  const embedColor =
+    typeof w.groupColor === 'number' && w.groupColor >= 0 ? w.groupColor : 0x7c3aed;
+
+  const embed = new EmbedBuilder()
+    .setColor(embedColor)
+    .setTitle(title)
     .setDescription(
       [
         `**Wallet** · ${w.label || w.addr?.slice(0, 8)}`,
         `**Groupe** · ${groupLine}`,
         `**Venue** · ${venueLabel(hit.venue)}`,
+        `**MC** · ${fmtU(meta.mcUsd)}`,
       ].join('\n'),
-    )
-    .addFields(
-      { name: 'Market cap', value: fmtU(meta.mcUsd), inline: true },
-      { name: 'Risque', value: risk, inline: true },
-      { name: 'Dépensé', value: sol, inline: true },
-      {
-        name: 'Contrat (CA)',
-        value: `\`\`\`${hit.mint}\`\`\``,
-        inline: false,
-      },
     )
     .setFooter({ text: sig ? `tx ${sig.slice(0, 16)}…` : 'Bundle Tracker' })
     .setTimestamp();
+
+  const img = String(meta.imageUrl || '').trim();
+  if (img.startsWith('http')) {
+    embed.setThumbnail(img);
+  }
+
+  return embed;
 }
 
-export function buildBuyButtons(links) {
+export function buildBuyButtons(links, mint) {
+  const m = String(mint || '').trim();
   const row1 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setLabel('Axiom').setStyle(ButtonStyle.Link).setURL(links.axiom),
-    new ButtonBuilder().setLabel('Pump.fun').setStyle(ButtonStyle.Link).setURL(links.pump),
-    new ButtonBuilder().setLabel('DexScreener').setStyle(ButtonStyle.Link).setURL(links.dex),
+    linkBtn('⚡ Axiom', links.axiom),
+    linkBtn('🟢 Pump', links.pump),
+    linkBtn('📊 Dex', links.dex),
   );
   const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setLabel('Solscan TX').setStyle(ButtonStyle.Link).setURL(links.solscan),
-    new ButtonBuilder().setLabel('Birdeye').setStyle(ButtonStyle.Link).setURL(links.birdeye),
+    linkBtn('🔍 Solscan', links.solscan),
+    linkBtn('🦅 Birdeye', links.birdeye),
+    new ButtonBuilder()
+      .setCustomId(`${COPY_CA_PREFIX}${m}`)
+      .setLabel('Copier CA')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('📋'),
   );
   return [row1, row2];
 }
@@ -85,7 +84,7 @@ export async function sendDiscordBuyAlert(channel, payload) {
   const { w, hit, meta, sig, axiomUrl } = payload;
   const links = buildBuyLinks(hit.mint, sig, axiomUrl);
   const embed = buildBuyEmbed({ w, hit, meta, sig });
-  const components = buildBuyButtons(links);
+  const components = buildBuyButtons(links, hit.mint);
   return channel.send({ embeds: [embed], components });
 }
 

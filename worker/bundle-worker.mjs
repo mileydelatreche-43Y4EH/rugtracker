@@ -274,11 +274,20 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
     };
   }
 
+  let resyncDebounce = null;
   onStoreChange(() => {
-    void (async () => {
-      rebuildWalletMaps();
-      await startAllWs();
-    })();
+    if (resyncDebounce) clearTimeout(resyncDebounce);
+    resyncDebounce = setTimeout(() => {
+      void (async () => {
+        try {
+          rebuildWalletMaps();
+          await startAllWs();
+          console.log('🔄 Wallets resynchronisés');
+        } catch (e) {
+          console.warn('resync wallets', e.message || e);
+        }
+      })();
+    }, 600);
   });
 
   return { start, rpcCall, rebuildWalletMaps };

@@ -3,7 +3,12 @@
  */
 import { readFileSync, existsSync } from 'fs';
 import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
-import { buildBuyEmbed, buildBuyButtons, buildBuyLinks } from '../api/lib/discord-alert.mjs';
+import {
+  buildBuyEmbed,
+  buildBuyButtons,
+  buildBuyLinks,
+  COPY_CA_PREFIX,
+} from '../api/lib/discord-alert.mjs';
 import { notifyBuyAlert } from '../api/lib/notify-buy.mjs';
 import {
   addWallet,
@@ -14,6 +19,7 @@ import {
   storeSummary,
   getActiveWallets,
   loadStore,
+  findGroup,
 } from '../api/lib/wallet-store.mjs';
 import { createBundleWorker } from '../worker/bundle-worker.mjs';
 import {
@@ -117,13 +123,21 @@ async function sendTestAlert() {
     label: 'Test',
     groupName: 'Demo',
     groupEmoji: '🧪',
+    groupColor: 0x7c3aed,
   };
   const hit = { mint: '7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr', sol: 0.1, venue: 'curve' };
-  const meta = { sym: 'TEST', mcUsd: 42000, pairAddress: '', snap: { risk: 'MEDIUM' } };
+  const meta = {
+    sym: 'TEST',
+    name: 'Token démo',
+    imageUrl: '',
+    mcUsd: 42000,
+    pairAddress: '',
+    snap: {},
+  };
   const links = buildBuyLinks(hit.mint, '', 'https://axiom.trade/?chain=sol');
   await alertChannel.send({
     embeds: [buildBuyEmbed({ w, hit, meta, sig: '' })],
-    components: buildBuyButtons(links),
+    components: buildBuyButtons(links, hit.mint),
   });
 }
 
@@ -168,9 +182,8 @@ async function handleButton(interaction) {
   }
 
   if (id === CID.REFRESH) {
-    if (workerHandle) await workerHandle.resync();
-    const screen = resolveScreen(CID.HOME);
-    await interaction.update(renderScreen(screen, uiCtx()));
+    if (workerHandle) void workerHandle.resync();
+    await interaction.update(renderScreen('settings', uiCtx()));
     await interaction.followUp({ content: '🔄 Surveillance actualisée.', ephemeral: true });
     return;
   }
@@ -187,7 +200,6 @@ async function handleSelect(interaction) {
 
   if (id === CID.SEL_RM_WL) {
     removeWallet(value);
-    if (workerHandle) await workerHandle.resync();
     await interaction.update(buildWalletRemoveSelect());
     await interaction.followUp({
       content: `🗑 Wallet retiré : \`${value.slice(0, 8)}…\``,
@@ -199,7 +211,6 @@ async function handleSelect(interaction) {
   if (id === CID.SEL_PAUSE) {
     const g = loadStore().groups.find(x => x.id === value);
     setGroupActive(value, false);
-    if (workerHandle) await workerHandle.resync();
     await interaction.update(renderScreen('gr_pause', uiCtx()));
     await interaction.followUp({
       content: `⏸ Groupe **${g?.name || value}** en pause.`,
@@ -211,7 +222,6 @@ async function handleSelect(interaction) {
   if (id === CID.SEL_RESUME) {
     const g = loadStore().groups.find(x => x.id === value);
     setGroupActive(value, true);
-    if (workerHandle) await workerHandle.resync();
     await interaction.update(renderScreen('gr_resume', uiCtx()));
     await interaction.followUp({
       content: `▶ Groupe **${g?.name || value}** actif.`,
@@ -221,45 +231,64 @@ async function handleSelect(interaction) {
 }
 
 async function handleModal(interaction) {
-  if (interaction.customId === CID.MODAL_WL_ADD) {
-    const addr = interaction.fields.getTextInputValue('addr').trim();
-    const label = interaction.fields.getTextInputValue('label').trim();
-    const group = interaction.fields.getTextInputValue('group').trim();
-    addWallet(addr, label, group || undefined);
-    if (workerHandle) await workerHandle.resync();
-    await interaction.reply({
-      content: `✅ **${label}** ajouté (\`${addr.slice(0, 8)}…\`).`,
-      ephemeral: true,
-    });
-    await updatePanel('wallets');
-    return;
-  }
+  await interaction.deferReply({ ephemeral: true });
 
-  if (interaction.customId === CID.MODAL_GR_ADD) {
-    const name = interaction.fields.getTextInputValue('name').trim();
-    const emoji = interaction.fields.getTextInputValue('emoji').trim() || '🎯';
-    addGroup(name, emoji);
-    await interaction.reply({ content: `✅ Groupe **${name}** créé.`, ephemeral: true });
-    await updatePanel('groups');
-    return;
-  }
+  try {
+    if (interaction.customId === CID.MODAL_WL_ADD) {
+      const addr = interaction.fields.getTextInputValue('addr').trim();
+      const label = interaction.fields.getTextInputValue('label').trim();
+      const group = interaction.fields.getTextInputValue('group').trim();
+      if (!label) throw new Error('Nom affiché obligatoire.');
+      const store = addWallet(addr, label, group || undefined);
+      const g = findGroup(store, group) || store.groups.find(x => x.wallets.some(w => w.addr === addr));
+      await interaction.editReply({
+        content: `✅ **${label}** ajouté dans **${g?.name || 'groupe'}** (\`${addr.slice(0, 8)}…\`). Surveillance relancée.`,
+      });
+      void updatePanel('wallets').catch(e => console.warn('updatePanel', e.message));
+      return;
+    }
 
-  if (interaction.customId === CID.MODAL_IMPORT) {
-    const raw = interaction.fields.getTextInputValue('json').trim();
-    const data = JSON.parse(raw);
-    const payload = data.groups ? data : { groups: data };
-    importBackup(payload);
-    if (workerHandle) await workerHandle.resync();
-    const sum = storeSummary();
-    await interaction.reply({
-      content: `✅ Import OK — **${sum.activeCount}** wallet(s) actif(s).`,
-      ephemeral: true,
-    });
-    await updatePanel('home');
+    if (interaction.customId === CID.MODAL_GR_ADD) {
+      const name = interaction.fields.getTextInputValue('name').trim();
+      const emoji = interaction.fields.getTextInputValue('emoji').trim() || '🎯';
+      if (!name) throw new Error('Nom du groupe obligatoire.');
+      addGroup(name, emoji);
+      await interaction.editReply({ content: `✅ Groupe **${name}** créé.` });
+      void updatePanel('groups').catch(() => {});
+      return;
+    }
+
+    if (interaction.customId === CID.MODAL_IMPORT) {
+      const raw = interaction.fields.getTextInputValue('json').trim();
+      let data;
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        throw new Error('JSON invalide — exporte depuis le site (Backup groupes).');
+      }
+      const payload = data.groups ? data : { groups: data };
+      importBackup(payload);
+      const sum = storeSummary();
+      await interaction.editReply({
+        content: `✅ Import OK — **${sum.activeCount}** wallet(s) actif(s). Surveillance relancée.`,
+      });
+      void updatePanel('home').catch(() => {});
+    }
+  } catch (e) {
+    await interaction.editReply({ content: `❌ ${e.message || e}` }).catch(() => {});
   }
 }
 
 async function handleInteraction(interaction) {
+  if (interaction.isButton() && interaction.customId?.startsWith(COPY_CA_PREFIX)) {
+    const mint = interaction.customId.slice(COPY_CA_PREFIX.length);
+    await interaction.reply({
+      content: `**Contrat (CA)**\n\`\`\`\n${mint}\n\`\`\``,
+      ephemeral: true,
+    });
+    return;
+  }
+
   if (interaction.isChatInputCommand()) {
     await interaction.reply({
       content: 'ℹ️ Utilise le **panneau de contrôle** (message épinglé avec boutons), pas les commandes `/`.',
@@ -286,8 +315,12 @@ async function handleInteraction(interaction) {
     else if (interaction.isModalSubmit()) await handleModal(interaction);
   } catch (e) {
     const msg = e.message || String(e);
-    if (interaction.isModalSubmit() && !interaction.replied) {
-      await interaction.reply({ content: `❌ ${msg}`, ephemeral: true }).catch(() => {});
+    if (interaction.isModalSubmit()) {
+      if (interaction.deferred) {
+        await interaction.editReply({ content: `❌ ${msg}` }).catch(() => {});
+      } else if (!interaction.replied) {
+        await interaction.reply({ content: `❌ ${msg}`, ephemeral: true }).catch(() => {});
+      }
     } else if (interaction.isButton() || interaction.isStringSelectMenu()) {
       await interaction
         .followUp({ content: `❌ ${msg}`, ephemeral: true })

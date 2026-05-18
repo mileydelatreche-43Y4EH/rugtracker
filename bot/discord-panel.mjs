@@ -13,8 +13,9 @@ import {
 import {
   loadStore,
   storeSummary,
-  getActiveWallets,
 } from '../api/lib/wallet-store.mjs';
+
+const PANEL_COLOR = 0x5865f2;
 
 export const CID = {
   HOME: 'bt:home',
@@ -28,6 +29,7 @@ export const CID = {
   GR_PAUSE: 'bt:gr:pause',
   GR_RESUME: 'bt:gr:resume',
   STATUS: 'bt:status',
+  SETTINGS: 'bt:settings',
   TEST: 'bt:test',
   EXPORT: 'bt:export',
   IMPORT: 'bt:import',
@@ -40,8 +42,8 @@ export const CID = {
   MODAL_IMPORT: 'bt:modal:import',
 };
 
-function btn(id, label, style = ButtonStyle.Secondary, emoji) {
-  const b = new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
+function btn(id, label, emoji) {
+  const b = new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(ButtonStyle.Secondary);
   if (emoji) b.setEmoji(emoji);
   return b;
 }
@@ -51,60 +53,50 @@ function row(...buttons) {
 }
 
 function backHome() {
-  return btn(CID.HOME, 'Menu principal', ButtonStyle.Primary, '🏠');
+  return btn(CID.HOME, 'Menu', '🏠');
+}
+
+function panelEmbed(title, description) {
+  return new EmbedBuilder().setColor(PANEL_COLOR).setTitle(title).setDescription(description);
 }
 
 export function buildHomePanel(heliusCount) {
   const sum = storeSummary();
-  const embed = new EmbedBuilder()
-    .setColor(0x7c3aed)
-    .setTitle('◈ Bundle Tracker — Panneau de contrôle')
-    .setDescription(
-      [
-        'Utilise les **boutons** ci-dessous pour tout gérer.',
-        '',
-        `▶ **${sum.activeCount}** wallet(s) surveillé(s)`,
-        `📁 **${loadStore().groups.length}** groupe(s)`,
-        `🔑 **${heliusCount}** clé(s) Helius`,
-      ].join('\n'),
-    )
-    .setFooter({ text: 'Les alertes d’achat arrivent dans ce salon · achats = messages séparés' })
-    .setTimestamp();
+  const embed = panelEmbed(
+    '◈ Bundle Tracker',
+    [
+      '**Menu principal** — tout se fait avec les boutons.',
+      '',
+      `▶ **${sum.activeCount}** wallet(s) actifs`,
+      `📁 **${loadStore().groups.length}** groupe(s)`,
+      `🔑 **${heliusCount}** clé(s) Helius`,
+      '',
+      '_Les achats apparaissent dans ce salon (messages séparés)._',
+    ].join('\n'),
+  ).setFooter({ text: 'Alertes optimisées · WS Helius + poll secours' });
 
-  const components = [
-    row(
-      btn(CID.WALLETS, 'Wallets', ButtonStyle.Primary, '👛'),
-      btn(CID.GROUPS, 'Groupes', ButtonStyle.Primary, '📁'),
-      btn(CID.STATUS, 'Statut', ButtonStyle.Secondary, '📊'),
-    ),
-    row(
-      btn(CID.TEST, 'Test alerte', ButtonStyle.Success, '🧪'),
-      btn(CID.IMPORT, 'Importer JSON', ButtonStyle.Secondary, '📥'),
-      btn(CID.EXPORT, 'Exporter', ButtonStyle.Secondary, '💾'),
-    ),
-    row(btn(CID.REFRESH, 'Actualiser', ButtonStyle.Secondary, '🔄')),
-  ];
-
-  return { embeds: [embed], components };
+  return {
+    embeds: [embed],
+    components: [
+      row(btn(CID.WALLETS, 'Wallets', '👛'), btn(CID.GROUPS, 'Groupes', '📁')),
+      row(btn(CID.STATUS, 'Statut', '📊'), btn(CID.SETTINGS, 'Paramètres', '⚙️')),
+    ],
+  };
 }
 
 export function buildWalletsMenu() {
   const sum = storeSummary();
-  const embed = new EmbedBuilder()
-    .setColor(0x5865f2)
-    .setTitle('👛 Wallets')
-    .setDescription(
-      `**${sum.activeCount}** wallet(s) actif(s).\nChoisis une action :`,
-    );
+  const embed = panelEmbed('👛 Wallets', `**${sum.activeCount}** wallet(s) surveillé(s).`);
 
   return {
     embeds: [embed],
     components: [
       row(
-        btn(CID.WL_LIST, 'Voir la liste', ButtonStyle.Secondary, '📋'),
-        btn(CID.WL_ADD, 'Ajouter', ButtonStyle.Success, '➕'),
-        btn(CID.WL_RM, 'Retirer', ButtonStyle.Danger, '➖'),
+        btn(CID.WL_LIST, 'Liste', '📋'),
+        btn(CID.WL_ADD, 'Ajouter', '➕'),
+        btn(CID.WL_RM, 'Retirer', '➖'),
       ),
+      row(btn(CID.IMPORT, 'Importer JSON', '📥'), btn(CID.EXPORT, 'Exporter JSON', '💾')),
       row(backHome()),
     ],
   };
@@ -119,14 +111,11 @@ export function buildWalletsList() {
       )
     : ['_Aucun wallet actif._'];
 
-  const embed = new EmbedBuilder()
-    .setColor(0x5865f2)
-    .setTitle('📋 Liste des wallets')
-    .setDescription(lines.join('\n\n').slice(0, 4000));
+  const embed = panelEmbed('📋 Liste des wallets', lines.join('\n\n').slice(0, 4000));
 
   return {
     embeds: [embed],
-    components: [row(btn(CID.WALLETS, '← Wallets', ButtonStyle.Secondary), backHome())],
+    components: [row(btn(CID.WALLETS, 'Retour', '◀'), backHome())],
   };
 }
 
@@ -145,14 +134,10 @@ export function buildWalletRemoveSelect() {
     }
   }
 
-  const embed = new EmbedBuilder()
-    .setColor(0xed4245)
-    .setTitle('➖ Retirer un wallet')
-    .setDescription(
-      options.length
-        ? 'Sélectionne le wallet à retirer :'
-        : '_Aucun wallet à retirer._',
-    );
+  const embed = panelEmbed(
+    '➖ Retirer un wallet',
+    options.length ? 'Choisis dans le menu :' : '_Aucun wallet._',
+  );
 
   const components = [row(backHome())];
   if (options.length) {
@@ -160,7 +145,7 @@ export function buildWalletRemoveSelect() {
       new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId(CID.SEL_RM_WL)
-          .setPlaceholder('Choisir un wallet…')
+          .setPlaceholder('Wallet à retirer…')
           .addOptions(options),
       ),
     );
@@ -170,34 +155,29 @@ export function buildWalletRemoveSelect() {
 }
 
 export function buildGroupsMenu() {
-  const embed = new EmbedBuilder()
-    .setColor(0x57f287)
-    .setTitle('📁 Groupes')
-    .setDescription('Organise tes wallets par groupe.');
+  const embed = panelEmbed('📁 Groupes', 'Créer, mettre en pause ou lister tes groupes.');
 
   return {
     embeds: [embed],
     components: [
       row(
-        btn(CID.GR_LIST, 'Voir la liste', ButtonStyle.Secondary, '📋'),
-        btn(CID.GR_ADD, 'Créer', ButtonStyle.Success, '➕'),
-        btn(CID.GR_PAUSE, 'Pause', ButtonStyle.Secondary, '⏸'),
+        btn(CID.GR_LIST, 'Liste', '📋'),
+        btn(CID.GR_ADD, 'Créer', '➕'),
+        btn(CID.GR_PAUSE, 'Pause', '⏸'),
       ),
-      row(btn(CID.GR_RESUME, 'Reprendre', ButtonStyle.Success, '▶'), backHome()),
+      row(btn(CID.GR_RESUME, 'Reprendre', '▶')),
+      row(backHome()),
     ],
   };
 }
 
 export function buildGroupsList() {
   const sum = storeSummary();
-  const embed = new EmbedBuilder()
-    .setColor(0x57f287)
-    .setTitle('📋 Groupes')
-    .setDescription(sum.lines.join('\n') || '_Aucun groupe._');
+  const embed = panelEmbed('📋 Groupes', sum.lines.join('\n') || '_Aucun groupe._');
 
   return {
     embeds: [embed],
-    components: [row(btn(CID.GROUPS, '← Groupes', ButtonStyle.Secondary), backHome())],
+    components: [row(btn(CID.GROUPS, 'Retour', '◀'), backHome())],
   };
 }
 
@@ -213,16 +193,14 @@ export function buildGroupSelect(customId, mode) {
         .setValue(g.id),
     );
 
-  const embed = new EmbedBuilder()
-    .setColor(mode === 'pause' ? 0xfaa61a : 0x57f287)
-    .setTitle(mode === 'pause' ? '⏸ Mettre en pause' : '▶ Réactiver')
-    .setDescription(
-      options.length
-        ? 'Sélectionne un groupe :'
-        : mode === 'pause'
-          ? '_Tous les groupes sont déjà en pause._'
-          : '_Aucun groupe en pause._',
-    );
+  const embed = panelEmbed(
+    mode === 'pause' ? '⏸ Pause groupe' : '▶ Reprendre groupe',
+    options.length
+      ? 'Choisis dans le menu :'
+      : mode === 'pause'
+        ? '_Tous les groupes sont actifs._'
+        : '_Aucun groupe en pause._',
+  );
 
   const components = [row(backHome())];
   if (options.length) {
@@ -230,7 +208,7 @@ export function buildGroupSelect(customId, mode) {
       new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId(customId)
-          .setPlaceholder('Choisir un groupe…')
+          .setPlaceholder('Groupe…')
           .addOptions(options),
       ),
     );
@@ -241,20 +219,40 @@ export function buildGroupSelect(customId, mode) {
 
 export function buildStatusPanel(heliusCount, channelId) {
   const sum = storeSummary();
-  const embed = new EmbedBuilder()
-    .setColor(0x95a5a6)
-    .setTitle('📊 Statut')
-    .addFields(
-      { name: 'Bot', value: '🟢 En ligne', inline: true },
-      { name: 'Wallets actifs', value: String(sum.activeCount), inline: true },
-      { name: 'Helius', value: `${heliusCount} clé(s)`, inline: true },
-      { name: 'Salon', value: `<#${channelId}>`, inline: false },
-    )
-    .setDescription(sum.lines.join('\n') || '_Aucun groupe._');
+  const embed = panelEmbed('📊 Statut', sum.lines.join('\n') || '_Aucun groupe._').addFields(
+    { name: 'Bot', value: '🟢 En ligne', inline: true },
+    { name: 'Wallets', value: String(sum.activeCount), inline: true },
+    { name: 'Helius', value: `${heliusCount} clé(s)`, inline: true },
+    { name: 'Salon', value: `<#${channelId}>`, inline: false },
+  );
 
   return {
     embeds: [embed],
     components: [row(backHome())],
+  };
+}
+
+export function buildSettingsPanel(heliusCount) {
+  const metaMs = process.env.NTFY_META_TIMEOUT_MS || '850';
+  const embed = panelEmbed(
+    '⚙️ Paramètres',
+    [
+      '**Test alerte** — fausse notif dans ce salon',
+      '**Actualiser** — relance la surveillance des wallets',
+      '',
+      `⚡ Délai meta alertes : ~${metaMs} ms`,
+      '⚡ Détection : WebSocket `processed` + poll secours',
+      '',
+      '_Notifications PC : active les notifs Discord pour ce serveur._',
+    ].join('\n'),
+  );
+
+  return {
+    embeds: [embed],
+    components: [
+      row(btn(CID.TEST, 'Test alerte', '🧪'), btn(CID.REFRESH, 'Actualiser', '🔄')),
+      row(backHome()),
+    ],
   };
 }
 
@@ -268,24 +266,22 @@ export function walletAddModal() {
           .setCustomId('addr')
           .setLabel('Adresse Solana')
           .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setPlaceholder('2WHHnAmD…'),
+          .setRequired(true),
       ),
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('label')
           .setLabel('Nom affiché')
           .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setPlaceholder('Bundle 4'),
+          .setRequired(true),
       ),
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('group')
-          .setLabel('Groupe (nom ou vide = défaut)')
+          .setLabel('Groupe (nom exact, vide = défaut)')
           .setStyle(TextInputStyle.Short)
           .setRequired(false)
-          .setPlaceholder('Bundles'),
+          .setPlaceholder('ex. migration 99% — laisse vide pour le 1er groupe'),
       ),
     );
 }
@@ -298,7 +294,7 @@ export function groupAddModal() {
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('name')
-          .setLabel('Nom du groupe')
+          .setLabel('Nom')
           .setStyle(TextInputStyle.Short)
           .setRequired(true),
       ),
@@ -321,7 +317,7 @@ export function importModal() {
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('json')
-          .setLabel('Colle le JSON (export site)')
+          .setLabel('JSON (export site)')
           .setStyle(TextInputStyle.Paragraph)
           .setRequired(true)
           .setMaxLength(4000),
@@ -338,8 +334,9 @@ export function exportAttachment() {
 export function resolveScreen(customId) {
   switch (customId) {
     case CID.HOME:
-    case CID.REFRESH:
       return 'home';
+    case CID.REFRESH:
+      return 'settings';
     case CID.WALLETS:
       return 'wallets';
     case CID.WL_LIST:
@@ -356,6 +353,8 @@ export function resolveScreen(customId) {
       return 'gr_resume';
     case CID.STATUS:
       return 'status';
+    case CID.SETTINGS:
+      return 'settings';
     default:
       return null;
   }
@@ -381,6 +380,8 @@ export function renderScreen(screen, ctx) {
       return buildGroupSelect(CID.SEL_RESUME, 'resume');
     case 'status':
       return buildStatusPanel(ctx.heliusCount, ctx.channelId);
+    case 'settings':
+      return buildSettingsPanel(ctx.heliusCount);
     default:
       return buildHomePanel(ctx.heliusCount);
   }

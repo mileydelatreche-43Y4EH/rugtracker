@@ -7,6 +7,32 @@ const defaultPath = resolve(__dir, '../../data/wallets.json');
 
 const listeners = new Set();
 
+/** Couleurs barre latérale embed par défaut (une par groupe). */
+export const GROUP_PALETTE = [
+  0x7c3aed,
+  0x2563eb,
+  0x059669,
+  0xd97706,
+  0xdb2777,
+  0x0891b2,
+  0x4f46e5,
+  0xca8a04,
+];
+
+export function parseGroupColor(raw) {
+  if (raw == null || raw === '') return null;
+  if (typeof raw === 'number' && raw >= 0) return raw;
+  const s = String(raw).replace('#', '').trim();
+  if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
+  return parseInt(s, 16);
+}
+
+export function groupEmbedColor(group, index = 0) {
+  const c = parseGroupColor(group?.color);
+  if (c != null) return c;
+  return GROUP_PALETTE[index % GROUP_PALETTE.length];
+}
+
 function storePath() {
   return process.env.WALLET_STORE_PATH || defaultPath;
 }
@@ -56,16 +82,17 @@ export function loadStore() {
 
 function normalizeStore(data) {
   data.version = 1;
-  for (const g of data.groups) {
+  data.groups.forEach((g, i) => {
     g.id = g.id || `g_${Date.now()}`;
     g.emoji = g.emoji || '🎯';
     g.active = g.active !== false;
+    if (g.color == null) g.color = GROUP_PALETTE[i % GROUP_PALETTE.length];
     g.wallets = Array.isArray(g.wallets) ? g.wallets.filter(w => w?.addr) : [];
     for (const w of g.wallets) {
       w.addr = String(w.addr).trim();
       w.label = w.label || w.addr.slice(0, 8);
     }
-  }
+  });
   return data;
 }
 
@@ -112,8 +139,9 @@ export function onStoreChange(fn) {
 
 export function getActiveWallets(store = loadStore()) {
   const out = [];
-  for (const g of store.groups) {
-    if (g.active === false) continue;
+  store.groups.forEach((g, gi) => {
+    if (g.active === false) return;
+    const groupColor = groupEmbedColor(g, gi);
     for (const w of g.wallets) {
       if (!w?.addr) continue;
       out.push({
@@ -122,9 +150,10 @@ export function getActiveWallets(store = loadStore()) {
         groupId: g.id,
         groupName: g.name,
         groupEmoji: g.emoji || '🎯',
+        groupColor,
       });
     }
-  }
+  });
   return out;
 }
 
@@ -157,13 +186,27 @@ export function setGroupActive(nameOrId, active) {
 export function addWallet(addr, label, groupRef) {
   const store = loadStore();
   const a = String(addr).trim();
-  if (a.length < 32) throw new Error('Adresse invalide');
-  const g = findGroup(store, groupRef) || store.groups[0];
-  if (!g) throw new Error('Aucun groupe');
-  if (g.wallets.some(w => w.addr === a)) throw new Error('Wallet déjà présent');
-  for (const og of store.groups) {
-    if (og.wallets.some(w => w.addr === a)) throw new Error(`Déjà dans « ${og.name} »`);
+  if (a.length < 32 || a.length > 48) throw new Error('Adresse Solana invalide (32–48 caractères).');
+  if (!/^[1-9A-HJ-NP-Za-km-z]+$/.test(a)) throw new Error('Adresse invalide (caractères base58 uniquement).');
+
+  const groupQuery = String(groupRef || '').trim();
+  let g = null;
+  if (!groupQuery) {
+    g = store.groups[0] || null;
+  } else {
+    g = findGroup(store, groupQuery);
+    if (!g) {
+      const names = store.groups.map(x => `« ${x.name} »`).join(', ') || '(aucun)';
+      throw new Error(`Groupe « ${groupQuery} » introuvable. Groupes : ${names}`);
+    }
   }
+  if (!g) throw new Error('Aucun groupe — crée-en un dans Groupes → Créer.');
+
+  if (g.wallets.some(w => w.addr === a)) throw new Error(`Déjà dans « ${g.name} ».`);
+  for (const og of store.groups) {
+    if (og.wallets.some(w => w.addr === a)) throw new Error(`Déjà dans le groupe « ${og.name} ».`);
+  }
+
   g.wallets.push({ addr: a, label: (label || a.slice(0, 8)).trim() });
   return saveStore(store);
 }
@@ -190,6 +233,7 @@ export function importBackup(payload) {
       name: g.name || 'Groupe',
       emoji: g.emoji || '🎯',
       active: g.active !== false,
+      color: g.color,
       wallets: (g.wallets || []).filter(w => w?.addr).map(w => ({
         addr: String(w.addr).trim(),
         label: w.label || String(w.addr).slice(0, 8),
