@@ -27,7 +27,8 @@ export const SCID = {
   SEL_RM: 'bt:sel:sniperm',
   BACK_TRADE: 'bt:trade',
   MODAL_SOL: 'bt:modal:snipesol:',
-  MODAL_MC: 'bt:modal:snipemc:',
+  MODAL_BUY_PCT: 'bt:modal:snipebuypct:',
+  MODAL_SELL_PCT: 'bt:modal:snipesellpct:',
 };
 
 function sbtn(id, label, style = ButtonStyle.Secondary) {
@@ -144,29 +145,34 @@ export function buildSnipeConfigPanel(watchAddr) {
       `\`${watchAddr}\``,
       w?.groupName ? `**Groupe** · ${w.groupEmoji} ${w.groupName}` : '',
       '',
-      `**Auto-buy snipe** · ${ab.enabled ? '🟢 **ACTIVÉ**' : '⚪ désactivé'}`,
-      `**Montant** · ${formatSolLabel(ab.solAmount)}`,
-      `**MC** · ${ab.minMcUsd || 0} – ${ab.maxMcUsd || '∞'} USD`,
-      `**Venues** · ${(ab.venues || []).join(', ')}`,
-      `**Max / token** · ${ab.maxPerMint}`,
+      `**Auto-buy** · ${ab.enabled ? '🟢 **ACTIVÉ**' : '⚪ désactivé'}`,
+      `**% achat copié** · **${ab.buyCopyPct}%** du montant SOL qu’il achète`,
+      `**Plafond SOL** · ${formatSolLabel(ab.solAmount)} max par achat`,
+      `**Auto-sell** · ${ab.autoSellEnabled ? '🟢 **ACTIVÉ**' : '⚪ désactivé'}`,
+      `**% vente copiée** · **${ab.sellCopyPct}%** de sa vente → même % sur ta position`,
+      `**Venues** · ${(ab.venues || []).join(', ')} · max **${ab.maxPerMint}** achat(s)/token`,
       '',
-      '_Quand ce wallet achète un token, tes wallets trading achètent automatiquement (si Trading ON)._',
+      '_Trading ON requis. Achat = % de son SOL (plafonné). Vente = quand il vend, tu vends le même % de ta position._',
     ]
       .filter(Boolean)
       .join('\n'),
   );
 
-  const toggleLabel = ab.enabled ? 'Désactiver auto snipe' : 'Activer auto snipe';
-  const toggleStyle = ab.enabled ? ButtonStyle.Danger : ButtonStyle.Success;
+  const buyTogLabel = ab.enabled ? 'Désactiver auto-buy' : 'Activer auto-buy';
+  const buyTogStyle = ab.enabled ? ButtonStyle.Danger : ButtonStyle.Success;
+  const sellTogLabel = ab.autoSellEnabled ? 'Désactiver auto-sell' : 'Activer auto-sell';
+  const sellTogStyle = ab.autoSellEnabled ? ButtonStyle.Danger : ButtonStyle.Success;
 
   return {
     embeds: [embed],
     components: [
-      srow(sbtn(`bt:snipe:tog:${watchAddr}`, toggleLabel, toggleStyle)),
+      srow(sbtn(`bt:snipe:tog:${watchAddr}`, buyTogLabel, buyTogStyle)),
       srow(
-        sbtn(`bt:snipe:sol:${watchAddr}`, '💰 Montant SOL'),
-        sbtn(`bt:snipe:mc:${watchAddr}`, '📊 Filtre MC'),
+        sbtn(`bt:snipe:buypct:${watchAddr}`, `% Achat ${ab.buyCopyPct}%`),
+        sbtn(`bt:snipe:sol:${watchAddr}`, 'Plafond SOL'),
+        sbtn(`bt:snipe:sellpct:${watchAddr}`, `% Vente ${ab.sellCopyPct}%`),
       ),
+      srow(sbtn(`bt:snipe:selltog:${watchAddr}`, sellTogLabel, sellTogStyle)),
       srow(sbtn(SCID.MENU, '◀ Retour liste')),
     ],
   };
@@ -176,12 +182,12 @@ export function snipeSolModal(watchAddr) {
   const snipe = getSnipeByAddr(watchAddr);
   return new ModalBuilder()
     .setCustomId(`${SCID.MODAL_SOL}${watchAddr}`)
-    .setTitle('Snipe — montant SOL')
+    .setTitle('Snipe — plafond SOL')
     .addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('sol')
-          .setLabel('SOL par snipe auto')
+          .setLabel('SOL max par achat auto')
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
           .setValue(String(snipe?.autoBuy?.solAmount ?? 0.1)),
@@ -189,27 +195,36 @@ export function snipeSolModal(watchAddr) {
     );
 }
 
-export function snipeMcModal(watchAddr) {
+export function snipeBuyPctModal(watchAddr) {
   const ab = getSnipeByAddr(watchAddr)?.autoBuy;
   return new ModalBuilder()
-    .setCustomId(`${SCID.MODAL_MC}${watchAddr}`)
-    .setTitle('Snipe — filtre MC')
+    .setCustomId(`${SCID.MODAL_BUY_PCT}${watchAddr}`)
+    .setTitle('Snipe — % achat copié')
     .addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
-          .setCustomId('min')
-          .setLabel('MC min USD (0 = off)')
+          .setCustomId('pct')
+          .setLabel('% du montant SOL qu’il achète (ex. 50)')
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
-          .setValue(String(ab?.minMcUsd ?? 0)),
+          .setValue(String(ab?.buyCopyPct ?? 100)),
       ),
+    );
+}
+
+export function snipeSellPctModal(watchAddr) {
+  const ab = getSnipeByAddr(watchAddr)?.autoBuy;
+  return new ModalBuilder()
+    .setCustomId(`${SCID.MODAL_SELL_PCT}${watchAddr}`)
+    .setTitle('Snipe — % vente copiée')
+    .addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
-          .setCustomId('max')
-          .setLabel('MC max USD')
+          .setCustomId('pct')
+          .setLabel('% de sa vente à copier (100 = miroir)')
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
-          .setValue(String(ab?.maxMcUsd ?? 250000)),
+          .setValue(String(ab?.sellCopyPct ?? 100)),
       ),
     );
 }

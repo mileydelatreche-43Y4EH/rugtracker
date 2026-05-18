@@ -5,15 +5,14 @@ import { readFileSync, existsSync } from 'fs';
 import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
 import {
   buildBuyLinks,
-  buildAlertMenuComponents,
   sendDiscordBuyAlert,
   COPY_CA_PREFIX,
   ALERT_MENU_PREFIX,
+  ALERT_BOT_HOME,
 } from '../api/lib/discord-alert.mjs';
 import { fetchTokenMetaFast } from '../api/lib/token-meta.mjs';
 import { axiomTradeUrl } from '../api/lib/axiom.mjs';
-import { getAlertContext } from '../api/lib/alert-context.mjs';
-import { notifyBuyAlert } from '../api/lib/notify-buy.mjs';
+import { notifyBuyAlert, notifySellAlert } from '../api/lib/notify-buy.mjs';
 import {
   addWallet,
   removeWallet,
@@ -54,7 +53,11 @@ import {
   isSnipePanelId,
   isSnipeModalId,
 } from './discord-snipe-handlers.mjs';
-import { dismissEphemeral, showEphemeralError } from './discord-ui.mjs';
+import {
+  dismissEphemeral,
+  showEphemeralError,
+  replyEphemeralBrief,
+} from './discord-ui.mjs';
 import { clearBalanceCache } from '../api/lib/wallet-balances.mjs';
 import {
   handleAlertsPanelButton,
@@ -126,16 +129,19 @@ let panelMessage = null;
 let notifyCtx = { discordChannel: null, ntfyTopic: '' };
 let workerHandle = null;
 
-async function clearSlashCommands() {
+async function registerMenuCommand() {
   const rest = new REST({ version: '10' }).setToken(TOKEN);
+  const commands = [{ name: 'menu', description: 'Ouvre le menu principal du bot' }];
   try {
     if (GUILD_ID) {
-      await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: [] });
+      await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
+      await rest.put(Routes.applicationCommands(CLIENT_ID), { body: [] });
+    } else {
+      await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
     }
-    await rest.put(Routes.applicationCommands(CLIENT_ID), { body: [] });
-    console.log('✅ Commandes slash supprimées (interface boutons uniquement)');
+    console.log('✅ Commande /menu enregistrée');
   } catch (e) {
-    console.warn('Slash clear', e.message || e);
+    console.warn('Slash register', e.message || e);
   }
 }
 
@@ -344,16 +350,18 @@ async function handleModal(interaction) {
 }
 
 async function handleInteraction(interaction) {
-  if (interaction.isButton() && interaction.customId?.startsWith(ALERT_MENU_PREFIX)) {
-    const mint = interaction.customId.slice(ALERT_MENU_PREFIX.length);
-    const ctx = getAlertContext(mint);
-    const links = ctx?.links || buildBuyLinks(mint, ctx?.sig || '', '');
-    const title = ctx?.sym
-      ? `☰ **${String(ctx.sym).toUpperCase()}**${ctx.name ? ` — ${ctx.name}` : ''}`
-      : '☰ Menu token';
+  if (
+    interaction.isButton() &&
+    (interaction.customId === ALERT_BOT_HOME ||
+      interaction.customId?.startsWith(ALERT_MENU_PREFIX))
+  ) {
+    if (!isAdmin(interaction.user.id)) {
+      await deny(interaction);
+      return;
+    }
+    void updatePanel('home');
     await interaction.reply({
-      content: `${title}\n\`${mint}\``,
-      components: buildAlertMenuComponents(links, mint),
+      ...(await buildHomePanel()),
       ephemeral: true,
     });
     return;
@@ -361,10 +369,10 @@ async function handleInteraction(interaction) {
 
   if (interaction.isButton() && interaction.customId?.startsWith(COPY_CA_PREFIX)) {
     const mint = interaction.customId.slice(COPY_CA_PREFIX.length);
-    await interaction.reply({
-      content: `**Contrat (CA)**\n\`\`\`\n${mint}\n\`\`\``,
-      ephemeral: true,
-    });
+    await replyEphemeralBrief(
+      interaction,
+      `**Contrat (CA)**\n\`\`\`\n${mint}\n\`\`\``,
+    );
     return;
   }
 
@@ -387,10 +395,18 @@ async function handleInteraction(interaction) {
   }
 
   if (interaction.isChatInputCommand()) {
-    await interaction.reply({
-      content: 'ℹ️ Utilise le **panneau de contrôle** (message épinglé avec boutons), pas les commandes `/`.',
-      ephemeral: true,
-    });
+    if (interaction.commandName === 'menu') {
+      if (!isAdmin(interaction.user.id)) {
+        await deny(interaction);
+        return;
+      }
+      void updatePanel('home');
+      await interaction.reply({
+        ...(await buildHomePanel()),
+        ephemeral: true,
+      });
+      return;
+    }
     return;
   }
 
@@ -455,7 +471,7 @@ async function setupPanel() {
 client.once('ready', async () => {
   console.log(`🤖 Discord connecté : ${client.user.tag}`);
 
-  await clearSlashCommands();
+  await registerMenuCommand();
 
   alertChannel = await client.channels.fetch(CHANNEL_ID);
   if (!alertChannel?.isTextBased()) {
@@ -467,8 +483,11 @@ client.once('ready', async () => {
 
   const worker = createBundleWorker({
     heliusKeys: HELIUS_KEYS,
-    onBuy: async (w, hit, { sig, rpcCall, walletIndex }) => {
-      await notifyBuyAlert(notifyCtx, w, hit, sig, rpcCall, walletIndex);
+    onBuy: async (w, hit, { sig, rpcCall, walletIndex, detectedAt }) => {
+      await notifyBuyAlert(notifyCtx, w, hit, sig, rpcCall, walletIndex, { detectedAt });
+    },
+    onSell: async (w, hit, { sig }) => {
+      await notifySellAlert(notifyCtx, w, hit, sig);
     },
   });
   workerHandle = await worker.start();

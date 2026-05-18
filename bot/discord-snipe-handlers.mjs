@@ -1,10 +1,17 @@
-import { upsertSnipe, removeSnipe, toggleSnipeAuto, getSnipeByAddr } from '../api/lib/snipe-settings.mjs';
+import {
+  upsertSnipe,
+  removeSnipe,
+  toggleSnipeAuto,
+  toggleSnipeAutoSell,
+  getSnipeByAddr,
+} from '../api/lib/snipe-settings.mjs';
 import { getActiveWallets } from '../api/lib/wallet-store.mjs';
 import {
   SCID,
   renderSnipeScreen,
   snipeSolModal,
-  snipeMcModal,
+  snipeBuyPctModal,
+  snipeSellPctModal,
   buildSnipeConfigPanel,
 } from './discord-snipe-panel.mjs';
 import { dismissEphemeral, showEphemeralError } from './discord-ui.mjs';
@@ -51,14 +58,26 @@ export async function handleSnipePanelButton(interaction) {
     await interaction.update(buildSnipeConfigPanel(addr));
     return true;
   }
+  if (id.startsWith('bt:snipe:selltog:')) {
+    const addr = id.slice('bt:snipe:selltog:'.length);
+    const snipe = getSnipeByAddr(addr);
+    await toggleSnipeAutoSell(addr, !snipe?.autoBuy?.autoSellEnabled);
+    await interaction.update(buildSnipeConfigPanel(addr));
+    return true;
+  }
   if (id.startsWith('bt:snipe:sol:')) {
     const addr = id.slice('bt:snipe:sol:'.length);
     await interaction.showModal(snipeSolModal(addr));
     return true;
   }
-  if (id.startsWith('bt:snipe:mc:')) {
-    const addr = id.slice('bt:snipe:mc:'.length);
-    await interaction.showModal(snipeMcModal(addr));
+  if (id.startsWith('bt:snipe:buypct:')) {
+    const addr = id.slice('bt:snipe:buypct:'.length);
+    await interaction.showModal(snipeBuyPctModal(addr));
+    return true;
+  }
+  if (id.startsWith('bt:snipe:sellpct:')) {
+    const addr = id.slice('bt:snipe:sellpct:'.length);
+    await interaction.showModal(snipeSellPctModal(addr));
     return true;
   }
 
@@ -105,11 +124,19 @@ export async function handleSnipeModal(interaction) {
       await dismissEphemeral(interaction);
       return true;
     }
-    if (cid.startsWith(SCID.MODAL_MC)) {
-      const addr = cid.slice(SCID.MODAL_MC.length);
-      const min = parseFloat(interaction.fields.getTextInputValue('min'));
-      const max = parseFloat(interaction.fields.getTextInputValue('max'));
-      upsertSnipe(addr, { autoBuy: { minMcUsd: min, maxMcUsd: max } });
+    if (cid.startsWith(SCID.MODAL_BUY_PCT)) {
+      const addr = cid.slice(SCID.MODAL_BUY_PCT.length);
+      const pct = parseFloat(interaction.fields.getTextInputValue('pct'));
+      if (!pct || pct <= 0 || pct > 1000) throw new Error('% achat entre 1 et 1000.');
+      upsertSnipe(addr, { autoBuy: { buyCopyPct: pct } });
+      await dismissEphemeral(interaction);
+      return true;
+    }
+    if (cid.startsWith(SCID.MODAL_SELL_PCT)) {
+      const addr = cid.slice(SCID.MODAL_SELL_PCT.length);
+      const pct = parseFloat(interaction.fields.getTextInputValue('pct'));
+      if (!pct || pct <= 0 || pct > 100) throw new Error('% vente entre 1 et 100.');
+      upsertSnipe(addr, { autoBuy: { sellCopyPct: pct } });
       await dismissEphemeral(interaction);
       return true;
     }

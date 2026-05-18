@@ -74,11 +74,14 @@ export async function buildHomePanel() {
   const balances = await fetchTradeWalletBalances();
   const s = loadTradeSettings();
   const walletBlock = formatHomeWalletsBlock(balances, s.enabledWalletIds);
+  const store = loadStore();
+  const tracked = store.groups.reduce((n, g) => n + g.wallets.length, 0);
+  const groups = store.groups.length;
 
   const embed = panelEmbed(
     '◈ Bundle Tracker',
     [
-      '**Menu principal** — tout se fait avec les boutons.',
+      `▶ **${tracked}** wallet(s) suivis · **${groups}** groupe(s)`,
       '',
       '**👛 Tes wallets**',
       walletBlock.slice(0, 3500),
@@ -257,7 +260,7 @@ export function buildSettingsPanel(heliusCount) {
       '**Actualiser** — relance la surveillance des wallets',
       '',
       `⚡ Délai meta alertes : ~${metaMs} ms`,
-      '⚡ Détection : WebSocket `processed` + poll secours',
+      '⚡ Détection : WebSocket Helius instantané (`processed`)',
       '',
       '_Notifications PC : active les notifs Discord pour ce serveur._',
     ].join('\n'),

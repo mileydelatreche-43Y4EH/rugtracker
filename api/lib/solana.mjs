@@ -102,6 +102,84 @@ export function extractAnyBuyFromTx(tx, walletAddr) {
   return extractPumpBuyFromTx(tx, walletAddr) || extractPumpSwapBuyFromTx(tx, walletAddr);
 }
 
+const PUMP_MINT_RE = /[1-9A-HJ-NP-Za-km-z]{32,44}pump/g;
+
+/** Tente d’extraire le mint depuis les logs Pump (avant getTransaction). */
+export function extractQuickBuyFromLogs(logs) {
+  const s = Array.isArray(logs) ? logs.join('\n') : String(logs || '');
+  if (!s.includes('Instruction: Buy')) return null;
+  const venue = s.includes(PUMP_SWAP) ? 'pumpswap' : s.includes(PUMP) ? 'curve' : 'curve';
+  const pumpMatches = s.match(PUMP_MINT_RE);
+  if (pumpMatches?.length) {
+    return { mint: pumpMatches[pumpMatches.length - 1], sol: 0, venue, quick: true };
+  }
+  return null;
+}
+
+/** Forme getTransaction depuis une notif Helius transactionSubscribe. */
+export function normalizeHeliusWsTransaction(result) {
+  if (!result) return null;
+  const inner = result.transaction;
+  if (inner?.meta && (inner.transaction || inner.message)) return inner;
+  if (result.meta && result.transaction) return result;
+  return null;
+}
+
+function tokenSellHit(tx, walletAddr, venue) {
+  const wl = String(walletAddr || '').toLowerCase();
+  const preByMint = new Map();
+  for (const pb of tx.meta.preTokenBalances || []) {
+    if ((pb.owner || '').toLowerCase() !== wl) continue;
+    const m = pb.mint || '';
+    if (!m || m === SOL_MINT) continue;
+    preByMint.set(
+      m,
+      parseFloat(pb.uiTokenAmount?.uiAmount || pb.uiTokenAmount?.amount || 0) || 0,
+    );
+  }
+  for (const pb of tx.meta.postTokenBalances || []) {
+    if ((pb.owner || '').toLowerCase() !== wl) continue;
+    const m = pb.mint || '';
+    if (!m || m === SOL_MINT || m.length < 30 || m.length > 44) continue;
+    const postAmt = parseFloat(pb.uiTokenAmount?.uiAmount || pb.uiTokenAmount?.amount || 0) || 0;
+    const preAmt = preByMint.get(m) || 0;
+    if (preAmt > postAmt + 1e-12) {
+      const sold = preAmt - postAmt;
+      const sellPct = Math.min(100, Math.max(1, (sold / preAmt) * 100));
+      const keys = txAccountPubkeys(tx);
+      const idx = keys.findIndex(pk => String(pk || '').toLowerCase() === wl);
+      let sol = 0;
+      if (idx >= 0) {
+        const pre = tx.meta?.preBalances?.[idx] ?? 0;
+        const post = tx.meta?.postBalances?.[idx] ?? 0;
+        sol = Math.max(0, (post - pre) / 1e9);
+      }
+      return { mint: m, sol, sellPct, venue };
+    }
+  }
+  return null;
+}
+
+export function extractPumpSellFromTx(tx, walletAddr) {
+  if (!tx?.meta || tx.meta.err) return null;
+  const logs = (tx.meta.logMessages || []).join(' ');
+  if (!logs.includes(PUMP) || !logs.includes('Instruction: Sell')) return null;
+  if (logs.includes('Instruction: Buy')) return null;
+  return tokenSellHit(tx, walletAddr, 'curve');
+}
+
+export function extractPumpSwapSellFromTx(tx, walletAddr) {
+  if (!tx?.meta || tx.meta.err) return null;
+  const logs = (tx.meta.logMessages || []).join(' ');
+  if (!logs.includes(PUMP_SWAP) || !logs.includes('Instruction: Sell')) return null;
+  if (logs.includes('Instruction: Buy')) return null;
+  return tokenSellHit(tx, walletAddr, 'pumpswap');
+}
+
+export function extractAnySellFromTx(tx, walletAddr) {
+  return extractPumpSellFromTx(tx, walletAddr) || extractPumpSwapSellFromTx(tx, walletAddr);
+}
+
 export async function fetchRecentSignatures(rpcUrl, addr, limit = 12) {
   const list = await rpc(rpcUrl, 'getSignaturesForAddress', [addr, { limit }]);
   return Array.isArray(list) ? list.filter(s => !s.err) : [];

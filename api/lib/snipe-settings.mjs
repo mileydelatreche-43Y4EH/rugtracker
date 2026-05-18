@@ -4,8 +4,9 @@ import { getActiveWallets } from './wallet-store.mjs';
 export const DEFAULT_SNIPE_AUTO = {
   enabled: false,
   solAmount: 0.1,
-  minMcUsd: 0,
-  maxMcUsd: 250000,
+  buyCopyPct: 100,
+  autoSellEnabled: false,
+  sellCopyPct: 100,
   venues: ['curve', 'pumpswap'],
   maxPerMint: 1,
 };
@@ -15,12 +16,25 @@ function normalizeAutoBuy(ab) {
     ...DEFAULT_SNIPE_AUTO,
     ...ab,
     solAmount: Math.min(50, Math.max(0.001, Number(ab?.solAmount) || DEFAULT_SNIPE_AUTO.solAmount)),
-    minMcUsd: Math.max(0, Number(ab?.minMcUsd) || 0),
-    maxMcUsd: Math.max(0, Number(ab?.maxMcUsd) || 250000),
+    buyCopyPct: Math.min(1000, Math.max(1, Number(ab?.buyCopyPct) || DEFAULT_SNIPE_AUTO.buyCopyPct)),
+    sellCopyPct: Math.min(100, Math.max(1, Number(ab?.sellCopyPct) || DEFAULT_SNIPE_AUTO.sellCopyPct)),
     venues: Array.isArray(ab?.venues) && ab.venues.length ? ab.venues : [...DEFAULT_SNIPE_AUTO.venues],
     maxPerMint: Math.min(5, Math.max(1, Number(ab?.maxPerMint) || 1)),
     enabled: !!ab?.enabled,
+    autoSellEnabled: !!ab?.autoSellEnabled,
   };
+}
+
+/** SOL à acheter : % du montant du wallet surveillé, plafonné par solAmount. */
+export function computeSnipeBuySol(ab, hit) {
+  const cap = Math.min(50, Math.max(0.001, Number(ab?.solAmount) || 0.1));
+  const watched = Number(hit?.sol) || 0;
+  const pct = Number(ab?.buyCopyPct) || 100;
+  if (watched > 0) {
+    const copied = watched * (pct / 100);
+    return Math.min(cap, Math.max(0.001, copied));
+  }
+  return cap;
 }
 
 export function listSnipes(settings = loadTradeSettings()) {
@@ -66,6 +80,17 @@ export function toggleSnipeAuto(watchAddr, enabled) {
   return upsertSnipe(watchAddr, { autoBuy: { enabled: !!enabled } });
 }
 
+export function toggleSnipeAutoSell(watchAddr, enabled) {
+  return upsertSnipe(watchAddr, { autoBuy: { autoSellEnabled: !!enabled } });
+}
+
+/** % de ta position à vendre quand le wallet surveillé vend (proportion miroir). */
+export function computeSnipeSellPct(ab, hit) {
+  const theirPct = Math.min(100, Math.max(1, Number(hit?.sellPct) || 100));
+  const scale = Math.min(100, Math.max(1, Number(ab?.sellCopyPct) || 100));
+  return Math.min(100, Math.max(1, (theirPct * scale) / 100));
+}
+
 export function snipeSummaryLines(settings = loadTradeSettings()) {
   const snipes = listSnipes(settings);
   const active = getActiveWallets();
@@ -74,11 +99,8 @@ export function snipeSummaryLines(settings = loadTradeSettings()) {
     const w = active.find(x => x.addr === s.watchAddr);
     const name = w?.label || s.label || s.watchAddr.slice(0, 8);
     const ab = s.autoBuy;
-    const st = ab.enabled ? `🟢 auto **${ab.solAmount} SOL**` : '⚪ auto off';
-    const mc =
-      ab.minMcUsd > 0 || ab.maxMcUsd > 0
-        ? ` · MC ${ab.minMcUsd || 0}–${ab.maxMcUsd || '∞'}`
-        : '';
-    return `🎯 **${name}** · ${st}${mc}\n\`${s.watchAddr}\``;
+    const st = ab.enabled ? `🟢 buy **${ab.buyCopyPct}%**` : '⚪ buy off';
+    const sell = ab.autoSellEnabled ? ` · sell **${ab.sellCopyPct}%**` : '';
+    return `🎯 **${name}** · ${st}${sell}\n\`${s.watchAddr}\``;
   });
 }

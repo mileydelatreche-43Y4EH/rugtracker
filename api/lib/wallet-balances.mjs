@@ -60,6 +60,7 @@ export function formatHomeWalletsBlock(balances, enabledIds = []) {
     const mark = on ? '🟢' : '⚪';
     return `${mark} **${bal}**\n**${w.label}**`;
   });
+  if (balances.length === 1) return lines[0];
   return [`**Total** · **${formatSolLabel(total)}**`, '', ...lines].join('\n\n');
 }
 

@@ -10,7 +10,10 @@ import { loadTradeSettings } from './trade-settings.mjs';
 import { rememberAlertContext } from './alert-context.mjs';
 
 export const COPY_CA_PREFIX = 'bt:ca:';
+/** Ancien menu token (messages déjà envoyés). */
 export const ALERT_MENU_PREFIX = 'bt:menu:';
+/** Ouvre le menu principal du bot (panneau + éphémère). */
+export const ALERT_BOT_HOME = 'bt:alert:home';
 
 function venueLabel(venue) {
   if (venue === 'pumpswap') return 'PumpSwap';
@@ -62,7 +65,7 @@ export function buildBuyEmbed({ w, hit, meta, sig }) {
 
   const img = resolveTokenImageUrl(mint, meta);
   if (img) {
-    embed.setThumbnail(img);
+    embed.setImage(img).setThumbnail(img);
   }
 
   return embed;
@@ -91,7 +94,7 @@ export function buildBuyButtons(links, mint) {
       .setLabel('📋 Copier CA')
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
-      .setCustomId(`${ALERT_MENU_PREFIX}${m}`)
+      .setCustomId(ALERT_BOT_HOME)
       .setLabel('☰ Menu')
       .setStyle(ButtonStyle.Primary),
   );
@@ -122,8 +125,7 @@ export function buildAlertMenuComponents(links, mint) {
   ];
 }
 
-export async function sendDiscordBuyAlert(channel, payload) {
-  if (!channel?.send) throw new Error('Canal Discord invalide');
+function buildAlertPayload(payload) {
   const { w, hit, meta, sig, axiomUrl } = payload;
   const links = buildBuyLinks(hit.mint, sig, axiomUrl);
   rememberAlertContext(hit.mint, { links, sig, sym: meta.sym, name: meta.name });
@@ -135,16 +137,42 @@ export async function sendDiscordBuyAlert(channel, payload) {
         ? `tx ${sig.slice(0, 12)}… · Trading ON — boutons ci-dessous`
         : 'Trading ON — boutons Buy/Sell ci-dessous',
     });
+  } else if (meta.mcUsd === 0 && !meta.name) {
+    embed.setFooter({ text: sig ? `tx ${sig.slice(0, 12)}…` : 'Mise à jour…' });
   }
   const components = buildBuyButtons(links, hit.mint);
+  return { embeds: [embed], components };
+}
+
+export async function sendDiscordBuyAlert(channel, payload) {
+  if (!channel?.send) throw new Error('Canal Discord invalide');
+  const body = buildAlertPayload(payload);
   try {
-    return await channel.send({ embeds: [embed], components });
+    return await channel.send(body);
   } catch (e) {
     const msg = String(e.message || e);
     if (!msg.includes('COMPONENT') && !msg.includes('50035') && !msg.includes('button')) {
       throw e;
     }
-    return channel.send({ embeds: [embed], components: components.slice(0, 2) });
+    return channel.send({
+      embeds: body.embeds,
+      components: body.components.slice(0, 2),
+    });
+  }
+}
+
+/** Met à jour l’alerte (image, MC, nom) après fetch meta. */
+export async function enrichDiscordBuyAlert(message, payload) {
+  if (!message?.edit) return null;
+  const body = buildAlertPayload(payload);
+  try {
+    return await message.edit(body);
+  } catch (e) {
+    const msg = String(e.message || e);
+    if (msg.includes('COMPONENT') || msg.includes('50035')) {
+      return message.edit({ embeds: body.embeds, components: body.components.slice(0, 2) });
+    }
+    throw e;
   }
 }
 

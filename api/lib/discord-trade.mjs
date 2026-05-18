@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { loadTradeSettings } from './trade-settings.mjs';
+import { listTradeWalletsPublic } from './trade-wallets.mjs';
 import { formatSolLabel } from './trade-format.mjs';
 
 export const TRADE_BUY_PREFIX = 'bt:tb:';
@@ -58,7 +59,8 @@ export function parseTradeButtonId(id) {
 
 export function buildTradeButtonRows(mint) {
   const s = loadTradeSettings();
-  if (!s.showTradeButtonsOnAlerts) return [];
+  if (!s.tradingEnabled || !s.showTradeButtonsOnAlerts) return [];
+  if (!listTradeWalletsPublic().length) return [];
 
   const m = String(mint || '').trim();
   const buys = s.buyPresetsSol.slice(0, 3);

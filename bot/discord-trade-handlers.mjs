@@ -24,7 +24,13 @@ import {
   tradeCustomSellModal,
 } from './discord-trade-panel.mjs';
 import { renderSnipeScreen } from './discord-snipe-panel.mjs';
-import { dismissEphemeral, showEphemeralError } from './discord-ui.mjs';
+import {
+  dismissEphemeral,
+  showEphemeralError,
+  scheduleEphemeralDismiss,
+} from './discord-ui.mjs';
+
+const tradeInflight = new Set();
 
 async function updateTradeScreen(interaction, screen) {
   await interaction.deferUpdate();
@@ -143,18 +149,22 @@ export async function handleTradeAlertButton(interaction) {
   const parsed = parseTradeButtonId(interaction.customId);
   if (!parsed?.mint) return false;
 
-  if (parsed.type === 'custom_buy') {
-    await interaction.showModal(tradeCustomBuyModal(parsed.mint));
-    return true;
-  }
-  if (parsed.type === 'custom_sell') {
-    await interaction.showModal(tradeCustomSellModal(parsed.mint));
-    return true;
-  }
-
-  await interaction.deferReply({ ephemeral: true });
+  const inflightKey = `${interaction.user.id}:${interaction.customId}`;
+  if (tradeInflight.has(inflightKey)) return true;
+  tradeInflight.add(inflightKey);
 
   try {
+    if (parsed.type === 'custom_buy') {
+      await interaction.showModal(tradeCustomBuyModal(parsed.mint));
+      return true;
+    }
+    if (parsed.type === 'custom_sell') {
+      await interaction.showModal(tradeCustomSellModal(parsed.mint));
+      return true;
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
     const s = loadTradeSettings();
     let result;
 
@@ -179,10 +189,14 @@ export async function handleTradeAlertButton(interaction) {
     await interaction.editReply({
       content: `**${parsed.type === 'sell' ? 'Vente' : 'Achat'}** · \`${parsed.mint.slice(0, 8)}…\`\n${result.text}`,
     });
+    scheduleEphemeralDismiss(interaction);
+    return true;
   } catch (e) {
     await showEphemeralError(interaction, e.message || String(e));
+    return true;
+  } finally {
+    tradeInflight.delete(inflightKey);
   }
-  return true;
 }
 
 export async function handleTradeModal(interaction) {
@@ -195,6 +209,7 @@ export async function handleTradeModal(interaction) {
     try {
       const result = await executeBuyTrade({ mint, solAmount: sol });
       await interaction.editReply({ content: result.text });
+      scheduleEphemeralDismiss(interaction);
     } catch (e) {
       await showEphemeralError(interaction, e.message);
     }
@@ -208,6 +223,7 @@ export async function handleTradeModal(interaction) {
     try {
       const result = await executeSellTrade({ mint, sellPct: pct });
       await interaction.editReply({ content: result.text });
+      scheduleEphemeralDismiss(interaction);
     } catch (e) {
       await showEphemeralError(interaction, e.message);
     }

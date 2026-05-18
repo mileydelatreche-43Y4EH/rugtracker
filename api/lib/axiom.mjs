@@ -1,5 +1,16 @@
 const pairCache = new Map();
 
+/** Lien Axiom immédiat (sans appel réseau). */
+export function axiomTradeUrlInstant(mint, pairAddress = '') {
+  const m = String(mint || '').trim();
+  if (pairAddress) {
+    return `https://axiom.trade/meme/${encodeURIComponent(pairAddress)}?chain=sol`;
+  }
+  if (!m) return 'https://axiom.trade/?chain=sol';
+  if (pairCache.has(m)) return pairCache.get(m);
+  return `https://axiom.trade/meme/${encodeURIComponent(m)}?chain=sol`;
+}
+
 /** Lien Axiom ouvrable depuis une notif ntfy (téléphone). */
 export async function axiomTradeUrl(mint, pairAddress = '') {
   const m = String(mint || '').trim();

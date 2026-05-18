@@ -1,6 +1,10 @@
 import { Connection } from '@solana/web3.js';
 import { loadTradeSettings } from './trade-settings.mjs';
-import { getSnipeByAddr } from './snipe-settings.mjs';
+import {
+  getSnipeByAddr,
+  computeSnipeBuySol,
+  computeSnipeSellPct,
+} from './snipe-settings.mjs';
 import { getSigningWallets } from './trade-wallets.mjs';
 import { getSolBalance, swapSolToToken, swapTokenToSol } from './jupiter-swap.mjs';
 import { primaryHeliusRpcUrl } from './helius-rpc.mjs';
@@ -8,7 +12,9 @@ import { primaryHeliusRpcUrl } from './helius-rpc.mjs';
 const snipeBuySeen = new Map();
 
 function pickWallets(settings, all) {
-  if (!all.length) throw new Error('Aucun wallet de trading configuré (TRADE_WALLETS_PATH ou TRADE_WALLETS_JSON).');
+  if (!all.length) {
+    throw new Error('Aucun wallet de trading — Paramètres → Trading → Wallets trading.');
+  }
   if (settings.multiWalletMode === 'first') return [all[0]];
   return all;
 }
@@ -105,9 +111,6 @@ export async function maybeSnipeBuy(watchedWallet, hit, meta) {
   if (!snipe?.autoBuy?.enabled) return null;
 
   const ab = snipe.autoBuy;
-  const mc = Number(meta?.mcUsd) || 0;
-  if (ab.minMcUsd > 0 && mc < ab.minMcUsd) return null;
-  if (ab.maxMcUsd > 0 && mc > ab.maxMcUsd) return null;
   if (ab.venues?.length && !ab.venues.includes(hit.venue)) return null;
 
   const mint = hit.mint;
@@ -121,11 +124,36 @@ export async function maybeSnipeBuy(watchedWallet, hit, meta) {
   }
 
   const label = watchedWallet.label || snipe.watchAddr.slice(0, 8);
+  const solAmount = computeSnipeBuySol(ab, hit);
   try {
-    const result = await executeBuyTrade({ mint, solAmount: ab.solAmount, settings });
-    return { ...result, snipeLabel: label };
+    const result = await executeBuyTrade({ mint, solAmount, settings });
+    return { ...result, snipeLabel: label, solAmount };
   } catch (e) {
     console.warn('snipe-buy', label, mint.slice(0, 8), e.message);
     return { text: `❌ Snipe **${label}** : ${e.message}`, ok: 0, total: 0, snipeLabel: label };
+  }
+}
+
+/** Snipe auto-sell quand le wallet surveillé vend (même % de position). */
+export async function maybeSnipeSell(watchedWallet, hit) {
+  const settings = loadTradeSettings();
+  if (!settings.tradingEnabled) return null;
+
+  const snipe = getSnipeByAddr(watchedWallet?.addr, settings);
+  if (!snipe?.autoBuy?.enabled || !snipe.autoBuy.autoSellEnabled) return null;
+
+  const ab = snipe.autoBuy;
+  if (ab.venues?.length && !ab.venues.includes(hit.venue)) return null;
+
+  const mint = hit.mint;
+  const sellPct = computeSnipeSellPct(ab, hit);
+  const label = watchedWallet.label || snipe.watchAddr.slice(0, 8);
+
+  try {
+    const result = await executeSellTrade({ mint, sellPct, settings });
+    return { ...result, snipeLabel: label, sellPct };
+  } catch (e) {
+    console.warn('snipe-sell', label, mint.slice(0, 8), e.message);
+    return { text: `❌ Snipe sell **${label}** : ${e.message}`, ok: 0, total: 0, snipeLabel: label };
   }
 }

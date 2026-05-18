@@ -1,10 +1,22 @@
-/** URL image token (meta → DexScreener → Pump.fun). */
+/** URL image token (meta → DexScreener → Pump CDN). */
 export function resolveTokenImageUrl(mint, meta = {}) {
   const direct = String(meta.imageUrl || '').trim();
   if (direct.startsWith('http')) return direct;
   const m = String(mint || '').trim();
   if (!m) return '';
   return `https://dd.dexscreener.com/ds-data/tokens/solana/${m}.png`;
+}
+
+export function minimalTokenMeta(mint) {
+  const m = String(mint || '').trim();
+  return {
+    sym: m.slice(0, 8).toUpperCase(),
+    name: '',
+    imageUrl: resolveTokenImageUrl(m, {}),
+    mcUsd: 0,
+    pairAddress: '',
+    snap: { risk: '…' },
+  };
 }
 
 export function fmtU(n) {
