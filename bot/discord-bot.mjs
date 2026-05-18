@@ -25,6 +25,7 @@ import {
   findGroup,
 } from '../api/lib/wallet-store.mjs';
 import { createBundleWorker } from '../worker/bundle-worker.mjs';
+import { ensureRailwayDataDir, resolvePersistPath } from '../api/lib/data-paths.mjs';
 import {
   CID,
   renderScreen,
@@ -118,6 +119,7 @@ if (!TOKEN || !CLIENT_ID || !CHANNEL_ID) {
 }
 if (!HELIUS_KEYS.length) process.exit(1);
 
+ensureRailwayDataDir();
 loadStore();
 loadTradeSettings();
 
@@ -470,6 +472,7 @@ async function setupPanel() {
 
 client.once('ready', async () => {
   console.log(`🤖 Discord connecté : ${client.user.tag}`);
+  console.log(`📂 Fichier wallets : ${resolvePersistPath('wallets.json', 'WALLET_STORE_PATH', 'data/wallets.json')}`);
 
   await registerMenuCommand();
 

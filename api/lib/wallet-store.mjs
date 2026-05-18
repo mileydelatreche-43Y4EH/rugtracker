@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
+import { resolvePersistPath } from './data-paths.mjs';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const defaultPath = resolve(__dir, '../../data/wallets.json');
@@ -34,7 +35,7 @@ export function groupEmbedColor(group, index = 0) {
 }
 
 function storePath() {
-  return process.env.WALLET_STORE_PATH || defaultPath;
+  return resolvePersistPath('wallets.json', 'WALLET_STORE_PATH', defaultPath);
 }
 
 function parseWatchWallets(raw) {

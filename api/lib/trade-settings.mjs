@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { formatBuyPresets, formatPriorityFeeAxiom, formatSolLabel } from './trade-format.mjs';
+import { resolvePersistPath } from './data-paths.mjs';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(__dir, '../../data/trade-settings.json');
@@ -24,7 +25,7 @@ export const DEFAULT_TRADE_SETTINGS = {
 const listeners = new Set();
 
 function settingsPath() {
-  return process.env.TRADE_SETTINGS_PATH || DEFAULT_PATH;
+  return resolvePersistPath('trade-settings.json', 'TRADE_SETTINGS_PATH', DEFAULT_PATH);
 }
 
 function normalize(input) {

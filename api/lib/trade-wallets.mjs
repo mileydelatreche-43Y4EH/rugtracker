@@ -3,12 +3,13 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import bs58 from 'bs58';
 import { Keypair } from '@solana/web3.js';
+import { resolvePersistPath } from './data-paths.mjs';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(__dir, '../../data/trade-wallets.json');
 
 function walletsPath() {
-  return process.env.TRADE_WALLETS_PATH || DEFAULT_PATH;
+  return resolvePersistPath('trade-wallets.json', 'TRADE_WALLETS_PATH', DEFAULT_PATH);
 }
 
 function decodeSecret(raw) {
