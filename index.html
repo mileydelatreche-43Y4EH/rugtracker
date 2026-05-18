@@ -430,15 +430,20 @@ select{font-family:'DM Sans',sans-serif;font-size:12px}
   </div>
 
   <div class="settings-card">
-    <p class="settings-title">📱 PC + téléphone (ntfy, sans site ouvert)</p>
-    <p class="settings-desc">App ou site <a href="https://ntfy.sh" target="_blank" rel="noopener" style="color:var(--purple2)">ntfy</a> — même topic sur les deux. Les achats 24/7 viennent de <strong>Railway</strong>, pas du navigateur. Si tu ne reçois rien sans onglet ouvert → Railway mal configuré (voir ci-dessous).</p>
+    <p class="settings-title">💬 Bot Discord</p>
+    <p class="settings-desc" style="line-height:1.5">Alertes + <strong>panneau boutons</strong> (pas de /commandes). <code style="font-size:10px">start-bot.bat</code> ou Railway.</p>
     <div class="irow" style="align-items:center;margin-top:8px">
-      <input type="text" id="ntfy-topic" autocomplete="off" spellcheck="false" placeholder="ton_topic_secret" style="flex:1;min-width:0;font-size:12px;padding:8px 10px;border-radius:7px"/>
-      <button type="button" class="btn-sm btn-sec" onclick="saveNtfyTopic()">OK</button>
-      <button type="button" class="btn-sm btn-sec" onclick="testNtfyPush()">🧪</button>
+      <!-- ntfy retiré : alertes via bot Discord -->
+      <button type="button" class="btn-sm" onclick="copyDiscordEnv()">⎘ Copier le .env</button>
+      <button type="button" class="btn-sm btn-sec" onclick="exportSiteBackup()">Backup groupes</button>
     </div>
-    <div id="ntfy-hint" style="font-size:11px;color:var(--green);margin-top:8px;min-height:16px;display:none"></div>
-    <div id="ntfy-status-line" class="settings-status"></div>
+    <pre id="discord-env-preview" style="font-size:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;max-height:100px;color:var(--text2);margin:8px 0 0"></pre>
+    <p id="discord-env-hint" class="settings-status" style="margin-top:8px"></p>
+  </div>
+
+  <div class="settings-card">
+    <p class="settings-title">☁ Bot 24/7 (Railway)</p>
+    <p class="settings-desc" style="line-height:1.55;font-size:12px"><strong>Webhook (simple)</strong> : salon → Intégrations → Webhook → copie l’URL dans <code style="font-size:10px">DISCORD_WEBHOOK_URL</code> sur Railway. Start <code style="font-size:10px">node worker/start.mjs</code>. Volume <code style="font-size:10px">/data</code> optionnel.</p>
   </div>
 
   <div class="settings-card">
@@ -449,13 +454,6 @@ select{font-family:'DM Sans',sans-serif;font-size:12px}
       <span id="desk-notify-status" style="font-size:12px;color:var(--text2)"></span>
     </div>
     <label class="pref-check" style="margin-top:10px"><input type="checkbox" id="pref-desk-ide-embed" onchange="saveSitePrefsFromForm()"/> Aussi depuis Cursor (peut doubler)</label>
-  </div>
-
-  <div class="settings-card">
-    <p class="settings-title">☁ Railway 24/7 (obligatoire)</p>
-    <p class="settings-desc">Start = <code style="font-size:10px">node worker/notify.mjs</code> · Build vide. Au redeploy tu dois recevoir « Bundle Tracker 24/7 OK » sur ntfy. Sinon le worker ne tourne pas.</p>
-    <button type="button" class="btn-sm btn-sec" onclick="copyCloudNotifyConfig()" style="margin-top:8px">⎘ Copier config</button>
-    <pre id="cloud-config-preview" style="font-size:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;max-height:90px;color:var(--text2);margin:10px 0 0"></pre>
   </div>
 
   <button type="button" class="btn-sm btn-sec" onclick="resetSitePrefsToDefaults()">Réinitialiser les réglages</button>
@@ -1594,40 +1592,38 @@ async function notifyDesktopNewToken(al, w, sym, imgUrl, snap) {
   }
 }
 
-function buildCloudNotifyEnvText() {
-  const wallets = getWs().map(w => ({ addr: w.addr, label: w.label || w.addr.slice(0, 8) }));
-  const topic = getNtfyTopic();
+function buildDiscordEnvText() {
   const keys = RPCS.map(u => (String(u).split('api-key=')[1] || '').split('&')[0].trim()).filter(k => k.length > 10);
-  const wl = JSON.stringify(wallets, null, 2);
   return [
+    '# Mode webhook (recommandé 24/7 Railway) :',
+    'DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/ID/TOKEN',
+    '',
+    '# Ou mode bot complet (/wallet add) :',
+    '# DISCORD_BOT_TOKEN=',
+    '# DISCORD_CLIENT_ID=',
+    '# DISCORD_GUILD_ID=',
+    '# DISCORD_CHANNEL_ID=',
+    '# DISCORD_ADMIN_IDS=',
+    '',
     'HELIUS_API_KEYS=' + (keys.length ? keys.join(',') : 'CLE1,CLE2,CLE3'),
-    'NTFY_TOPIC=' + (topic || 'ton_topic_secret'),
-    'WATCH_WALLETS=' + JSON.stringify(wallets),
-    '',
-    '# Railway → Settings → Deploy : Start Command = node worker/notify.mjs',
-    '# Build Command = (vide)',
-    '',
-    '# WATCH_WALLETS (lisible) :',
-    '# ' + wl.replace(/\n/g, '\n# '),
+    'WALLET_STORE_PATH=./data/wallets.json',
   ].join('\n');
 }
 
-function refreshCloudConfigPreview() {
-  const pre = document.getElementById('cloud-config-preview');
-  if (pre) pre.textContent = buildCloudNotifyEnvText();
+function refreshDiscordEnvPreview() {
+  const pre = document.getElementById('discord-env-preview');
+  if (pre) pre.textContent = buildDiscordEnvText();
 }
 
-function copyCloudNotifyConfig() {
-  saveNtfyTopic();
-  const text = buildCloudNotifyEnvText();
+function copyDiscordEnv() {
+  const text = buildDiscordEnvText();
   navigator.clipboard.writeText(text).then(() => {
-    const h = document.getElementById('ntfy-hint');
+    const h = document.getElementById('discord-env-hint');
     if (h) {
-      h.style.display = 'block';
       h.style.color = 'var(--green)';
-      h.textContent = 'Config .env copiée — colle sur Railway/Vercel, garde le même NTFY_TOPIC sur le téléphone.';
+      h.textContent = '.env copié — crée le fichier .env dans le dossier du projet, puis lance start-bot.bat';
     }
-    refreshCloudConfigPreview();
+    refreshDiscordEnvPreview();
   });
 }
 
@@ -1671,7 +1667,7 @@ function applySiteBackup(data) {
   rebuildGroupFilterPills();
   syncWalletSubscriptions();
   reconnectAllWalletWs();
-  refreshCloudConfigPreview();
+  refreshDiscordEnvPreview();
   updateNtfyStatusLine();
   if (!applyingCloudBackup) scheduleCloudBackup();
   return true;
@@ -2527,7 +2523,7 @@ function goPage(page, el) {
   if(page==='groups') renderGList();
   if(page==='pumpswap') updatePsContinueBtn();
   if(page==='analysis') popSel();
-  if(page==='settings') { loadNtfyField(); loadPrefsIntoForm(); updateDeskNotifyStatus(); updateNtfyStatusLine(); refreshCloudConfigPreview(); loadCloudSyncSettingsUi(); }
+  if(page==='settings') { loadPrefsIntoForm(); updateDeskNotifyStatus(); refreshDiscordEnvPreview(); loadCloudSyncSettingsUi(); }
 }
 
 // ═══════ RISQUE HOLDERS (sans score numérique) ═══════
@@ -4878,7 +4874,7 @@ async function boot() {
   await pullCloudOnBoot();
   updateDeskNotifyStatus();
   updateNtfyStatusLine();
-  refreshCloudConfigPreview();
+  refreshDiscordEnvPreview();
   loadCloudSyncSettingsUi();
   renderSB();
   popSel();

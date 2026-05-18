@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "groups": [
+    {
+      "id": "bundlers",
+      "name": "Bundlers principaux",
+      "emoji": "🎯",
+      "active": true,
+      "wallets": [
+        {
+          "addr": "2wHHnAmdhFaAAsayWAeqKe3snK3KkbRQkRgLwTtz7iCi",
+          "label": "Bundle 1"
+        },
+        {
+          "addr": "9yxmCNwZcHe63NucU9yvCt7b1ja3jwP9v4T3yFMkQ1Z9",
+          "label": "Bundle 2"
+        },
+        {
+          "addr": "2AqFJzcgSMQ9v7Vwh4yE7Vux8brcrjus1eg4K1zM2zUd",
+          "label": "Bundle 3"
+        },
+        {
+          "addr": "22vL22PcYcoAVCwYN8iDW9VrFEYq93TCtr7a6avNVyjL",
+          "label": "Bundle 4"
+        }
+      ]
+    },
+    {
+      "id": "g_1778528215338",
+      "name": "migration 99%",
+      "emoji": "🚀",
+      "active": true,
+      "wallets": [
+        {
+          "addr": "24H2M8ipVjQGrtVHad8b56hiJ4GwgvQkCZAqajzhREiY",
+          "label": "24H2M8ip"
+        },
+        {
+          "addr": "GAqHhm9pCjTVfnySMn1VWt31mVYLoEUcwhCFWZvv6M2Y",
+          "label": "GAqHhm9p"
+        },
+        {
+          "addr": "HMUgDtCgvq9aWnH4NB4eeiU6roq8uKxNB8GekvStB4jX",
+          "label": "HMUgDtCg"
+        },
+        {
+          "addr": "46Ex6NYkABruJzRHtRGhNGxp8n536chgHoq3Q9EwXsZL",
+          "label": "46Ex6NYk"
+        },
+        {
+          "addr": "5ispn3CGXRxEzezbB284TRgxJywhgCyjFL5mFrYQtYto",
+          "label": "5ispn3CG"
+        }
+      ]
+    },
+    {
+      "id": "g_1778528270288",
+      "name": "BUNDLE 100K",
+      "emoji": "🐋",
+      "active": true,
+      "wallets": [
+        {
+          "addr": "CZMvsfuFkCLQV6cgXkyMDvDAQ5sL3B7r6Jy69CRuBYyF",
+          "label": "CZMv…BYyF"
+        },
+        {
+          "addr": "iGiyBNJ9eKcPfBLaoVCEMx3WCyrnUT1SfKZL2DYifcL",
+          "label": "iGiy…ifcL"
+        },
+        {
+          "addr": "JBV41vYBL2b8HuBmNcCnpRoBfrLDJrUFViQFPJ2vZrWd",
+          "label": "JBV4…ZrWd"
+        },
+        {
+          "addr": "HJanh4pRroez2icDzkNdnF889wMUYDMvKPaR8FmFsnSk",
+          "label": "HJan…snSk"
+        }
+      ]
+    },
+    {
+      "id": "g_1778528328647",
+      "name": "SLOW BUNDLE",
+      "emoji": "📈",
+      "active": true,
+      "wallets": [
+        {
+          "addr": "9tyXPmVbHVbfiBywcmpExvjn4znnL4b95fF9n5os11zP",
+          "label": "9tyXPmVb"
+        },
+        {
+          "addr": "Hg6FMHTBud7UAxkph9SC2xpujdezFb9QDa3gRoN58xAF",
+          "label": "Hg6FMHTB"
+        },
+        {
+          "addr": "3wn64jVbab5yzFeumtu1DAUwPt1Ut5rW1NYGTkF3T6YQ",
+          "label": "3wn64jVb"
+        },
+        {
+          "addr": "4kGRBT5suk4XwfXMDkyM5LtXXAww6sVP44YG5MrwKn1t",
+          "label": "4kGRBT5s"
+        }
+      ]
+    },
+    {
+      "id": "g_1778528359270",
+      "name": "MOUAIS",
+      "emoji": "🍀",
+      "active": true,
+      "wallets": [
+        {
+          "addr": "8GuqLjTdRr3ynrvhfjdSrSabbamZhqtHXb9T4MRNNKf7",
+          "label": "8GuqLjTd"
+        },
+        {
+          "addr": "H3A2ypaux3aqbLiXSYAJH8BrQtzEijYvAdxgrAab8wBh",
+          "label": "H3A2ypau"
+        },
+        {
+          "addr": "7AFxLU4fvvJRXD3Qhg6i44EZSkjBX449p7rx5zDwmTo6",
+          "label": "7AFxLU4f"
+        },
+        {
+          "addr": "A6N4g2sc7Skh5a7CSkh7oRctkpmjrrSqpXTymSEFvyr2",
+          "label": "A6N4g2sc"
+        }
+      ]
+    },
+    {
+      "id": "g_1778761888081",
+      "name": "30k topper",
+      "emoji": "❤️",
+      "active": true,
+      "wallets": [
+        {
+          "addr": "HcrgHm8SRVMGusPxrimAzK4oNMgLeibPrxwj3tkcHnR3",
+          "label": "HcrgHm8S"
+        },
+        {
+          "addr": "2Y4Q4sEPezD2aQ1f5j278Jj7QbCg7mnKZmAdXTVADz5s",
+          "label": "2Y4Q4sEP"
+        },
+        {
+          "addr": "ChHLuMTdwcv2oUKfoWzxotDs9q6881xnR8uGwUAqBQVE",
+          "label": "ChHLuMTd"
+        },
+        {
+          "addr": "82Bo1Mac8UwDaWFRDCGFpFWfbzFK3wvZMuXX3xka3Emd",
+          "label": "82Bo1Mac"
+        }
+      ]
+    }
+  ]
+}
