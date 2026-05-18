@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { loadTradeSettings } from './trade-settings.mjs';
+import { formatSolLabel } from './trade-format.mjs';
 
 export const TRADE_BUY_PREFIX = 'bt:tb:';
 export const TRADE_SELL_PREFIX = 'bt:ts:';
@@ -67,7 +68,7 @@ export function buildTradeButtonRows(mint) {
     ...buys.map((sol, i) =>
       new ButtonBuilder()
         .setCustomId(tradeBuyId(m, i))
-        .setLabel(`Buy ${sol}◎`)
+        .setLabel(`Buy ${formatSolLabel(sol)}`.slice(0, 80))
         .setStyle(ButtonStyle.Success)
         .setEmoji('🟢'),
     ),

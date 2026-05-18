@@ -15,6 +15,15 @@ import {
   tradeSettingsSummary,
 } from '../api/lib/trade-settings.mjs';
 import { listTradeWalletsPublic } from '../api/lib/trade-wallets.mjs';
+import {
+  formatPriorityFeeAxiom,
+  formatSolLabel,
+  AXIOM_PRIORITY_PRESETS,
+} from '../api/lib/trade-format.mjs';
+import {
+  fetchTradeWalletBalances,
+  formatWalletsBalanceBlock,
+} from '../api/lib/wallet-balances.mjs';
 
 const TRADE_COLOR = 0x22c55e;
 
@@ -35,6 +44,8 @@ export const TCID = {
   AUTO_SOL: 'bt:trade:autosol',
   AUTO_MC: 'bt:trade:automc',
   RESERVE: 'bt:trade:reserve',
+  REFRESH_BAL: 'bt:trade:refreshbal',
+  PRIO_CUSTOM: 'bt:trade:priocustom',
   SEL_WL_TOGGLE: 'bt:sel:trwl',
   SEL_WL_RM: 'bt:sel:trrm',
   MODAL_BUY_PRESETS: 'bt:modal:trbuyp',
@@ -63,37 +74,45 @@ function tradeEmbed(title, description) {
   return new EmbedBuilder().setColor(TRADE_COLOR).setTitle(title).setDescription(description);
 }
 
-export function buildTradeMenu() {
+export async function buildTradeMenu() {
   const s = loadTradeSettings();
-  const wallets = listTradeWalletsPublic();
+  const balances = await fetchTradeWalletBalances();
+  const prio = formatPriorityFeeAxiom(s.priorityFeeLamports);
+  const walletBlock = formatWalletsBalanceBlock(balances, s.enabledWalletIds);
+
   const embed = tradeEmbed(
     '💹 Trading Jupiter',
     [
       ...tradeSettingsSummary(s),
       '',
-      `👛 Wallets signataires : **${wallets.length}**`,
+      '**👛 Wallets & soldes**',
+      walletBlock.slice(0, 1800),
       '',
-      '_Les clés privées restent sur le serveur (fichier volume / variable env). Jamais dans Git._',
-      '_Active **Trading ON** puis configure tes wallets avant d’utiliser Buy/Sell sur les alertes._',
+      '_Clés privées sur le serveur uniquement. Priority fee : clique ⚡ pour changer (Normal → Fast → Turbo → Ultra)._',
     ].join('\n'),
   );
 
   const onOff = s.tradingEnabled ? '🔴 Désactiver trading' : '🟢 Activer trading';
   const onStyle = s.tradingEnabled ? ButtonStyle.Danger : ButtonStyle.Success;
+  const prioBtnLabel = `Fee ${prio.tier}`.slice(0, 80);
 
   return {
     embeds: [embed],
     components: [
       trow(tbtn(TCID.TOGGLE, onOff, onStyle)),
       trow(
-        tbtn(TCID.BUY_PRESETS, 'Montants achat', ButtonStyle.Secondary, '💰'),
-        tbtn(TCID.SELL_PRESETS, 'Montants vente', ButtonStyle.Secondary, '📉'),
+        tbtn(TCID.BUY_PRESETS, 'Montants achat SOL', ButtonStyle.Secondary, '💰'),
+        tbtn(TCID.SELL_PRESETS, 'Montants vente %', ButtonStyle.Secondary, '📉'),
         tbtn(TCID.SLIP, 'Slippage', ButtonStyle.Secondary, '〰️'),
       ),
       trow(
-        tbtn(TCID.PRIO, 'Priorité fees', ButtonStyle.Secondary, '⚡'),
+        tbtn(TCID.PRIO, prioBtnLabel, ButtonStyle.Secondary, '⚡'),
+        tbtn(TCID.PRIO_CUSTOM, 'Fee custom SOL', ButtonStyle.Secondary, '✏️'),
         tbtn(TCID.MULTI, `Multi: ${s.multiWalletMode}`, ButtonStyle.Secondary, '👛'),
-        tbtn(TCID.RESERVE, 'Réserve SOL', ButtonStyle.Secondary, '🛡️'),
+      ),
+      trow(
+        tbtn(TCID.RESERVE, `Réserve ${formatSolLabel(s.minSolReserve)}`, ButtonStyle.Secondary, '🛡️'),
+        tbtn(TCID.REFRESH_BAL, 'Rafraîchir soldes', ButtonStyle.Secondary, '🔄'),
       ),
       trow(
         tbtn(TCID.WALLETS, 'Wallets trading', ButtonStyle.Primary, '🔑'),
@@ -104,36 +123,42 @@ export function buildTradeMenu() {
   };
 }
 
-export function buildTradeWalletsPanel() {
+export async function buildTradeWalletsPanel() {
   const s = loadTradeSettings();
-  const wallets = listTradeWalletsPublic();
+  const balances = await fetchTradeWalletBalances();
   const enabled = new Set(s.enabledWalletIds || []);
 
-  const lines = wallets.length
-    ? wallets.map(w => {
+  const lines = balances.length
+    ? balances.map(w => {
         const on = !enabled.size || enabled.has(w.id);
-        return `${on ? '🟢' : '⚪'} **${w.label}**\n\`${w.pubkey}\` _(${w.source})_`;
+        const bal = w.sol == null ? '…' : formatSolLabel(w.sol);
+        return `${on ? '🟢' : '⚪'} **${w.label}** · **${bal}**\n\`${w.pubkey}\` _(${w.source})_`;
       })
     : ['_Aucun wallet — ajoute-en un ou définis TRADE_WALLETS_JSON sur Railway._'];
 
-  const embed = tradeEmbed('🔑 Wallets de trading', lines.join('\n\n').slice(0, 3900));
+  const total = balances.reduce((sum, w) => sum + (w.sol ?? 0), 0);
+  const embed = tradeEmbed(
+    '🔑 Wallets de trading',
+    [`**Total** · **${formatSolLabel(total)}**`, '', ...lines].join('\n\n').slice(0, 3900),
+  );
 
   const components = [
     trow(tbtn(TCID.WL_ADD, 'Ajouter clé', ButtonStyle.Success, '➕'), tbtn(TCID.WL_RM, 'Retirer', ButtonStyle.Danger, '➖')),
     trow(tbtn(TCID.MENU, 'Retour trading', ButtonStyle.Secondary, '◀')),
   ];
 
-  if (wallets.length) {
+  if (balances.length) {
     components.unshift(
       new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId(TCID.SEL_WL_TOGGLE)
           .setPlaceholder('Activer / désactiver un wallet…')
           .addOptions(
-            wallets.slice(0, 25).map(w => {
+            balances.slice(0, 25).map(w => {
               const on = !enabled.size || enabled.has(w.id);
+              const bal = w.sol == null ? '?' : formatSolLabel(w.sol);
               return new StringSelectMenuOptionBuilder()
-                .setLabel(`${on ? '✓' : '○'} ${w.label}`.slice(0, 100))
+                .setLabel(`${on ? '✓' : '○'} ${w.label} · ${bal}`.slice(0, 100))
                 .setDescription(w.pubkey.slice(0, 50))
                 .setValue(`${on ? 'off' : 'on'}:${w.id}`);
             }),
@@ -259,19 +284,31 @@ export function tradeSlipModal() {
 
 export function tradePrioModal() {
   const s = loadTradeSettings();
+  const sol = (s.priorityFeeLamports / 1e9).toString();
+  const hint = AXIOM_PRIORITY_PRESETS.map(p => `${p.name}=${p.sol}`).join(', ');
   return new ModalBuilder()
     .setCustomId(TCID.MODAL_PRIO)
-    .setTitle('Frais de priorité')
+    .setTitle('Priority fee (SOL)')
     .addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
-          .setCustomId('lamports')
-          .setLabel('Lamports (ex. 200000)')
+          .setCustomId('sol')
+          .setLabel(`SOL (Axiom: ${hint})`)
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
-          .setValue(String(s.priorityFeeLamports)),
+          .setValue(sol),
       ),
     );
+}
+
+export function cyclePriorityPreset() {
+  const s = loadTradeSettings();
+  const presets = AXIOM_PRIORITY_PRESETS;
+  let idx = presets.findIndex(p => p.lamports === s.priorityFeeLamports);
+  if (idx < 0) idx = 0;
+  const next = presets[(idx + 1) % presets.length];
+  patchTradeSettings({ priorityFeeLamports: next.lamports });
+  return next;
 }
 
 export function tradeWalletAddModal() {
@@ -417,17 +454,17 @@ export function resolveTradeScreen(id) {
   return null;
 }
 
-export function renderTradeScreen(screen) {
+export async function renderTradeScreen(screen) {
   switch (screen) {
     case 'trade':
-      return buildTradeMenu();
+      return await buildTradeMenu();
     case 'trade_wallets':
-      return buildTradeWalletsPanel();
+      return await buildTradeWalletsPanel();
     case 'trade_wl_rm':
       return buildTradeWalletRemoveSelect();
     case 'trade_auto':
       return buildTradeAutoPanel();
     default:
-      return buildTradeMenu();
+      return await buildTradeMenu();
   }
 }

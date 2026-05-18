@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { formatBuyPresets, formatPriorityFeeAxiom, formatSolLabel } from './trade-format.mjs';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(__dir, '../../data/trade-settings.json');
@@ -88,13 +89,18 @@ export function onTradeSettingsChange(fn) {
 }
 
 export function tradeSettingsSummary(s = loadTradeSettings()) {
-  const auto = s.autoBuy?.enabled ? `🟢 ${s.autoBuy.solAmount} SOL` : '🔴 off';
+  const auto = s.autoBuy?.enabled
+    ? `🟢 ${formatSolLabel(s.autoBuy.solAmount)}`
+    : '🔴 off';
+  const prio = formatPriorityFeeAxiom(s.priorityFeeLamports);
   return [
     `Trading : **${s.tradingEnabled ? 'ON' : 'OFF'}**`,
     `Boutons alertes : **${s.showTradeButtonsOnAlerts ? 'ON' : 'OFF'}**`,
-    `Achat : ${s.buyPresetsSol.map(x => `${x}◎`).join(' · ')}`,
+    `Achat : ${formatBuyPresets(s.buyPresetsSol)}`,
     `Vente : ${s.sellPresetsPct.map(x => `${x}%`).join(' · ')}`,
-    `Slippage : **${(s.slippageBps / 100).toFixed(1)}%** · Priorité : **${s.priorityFeeLamports}** lamports`,
+    `Slippage : **${(s.slippageBps / 100).toFixed(1)}%**`,
+    `Priority fee : ${prio.line} _(style Axiom)_`,
+    `Réserve min : **${formatSolLabel(s.minSolReserve)}**`,
     `Multi-wallet : **${s.multiWalletMode}**`,
     `Auto-buy : ${auto}`,
   ];

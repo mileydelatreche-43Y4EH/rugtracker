@@ -366,7 +366,7 @@ export function resolveScreen(customId) {
   }
 }
 
-export function renderScreen(screen, ctx) {
+export async function renderScreen(screen, ctx) {
   switch (screen) {
     case 'home':
       return buildHomePanel(ctx.heliusCount);
@@ -389,7 +389,7 @@ export function renderScreen(screen, ctx) {
     case 'settings':
       return buildSettingsPanel(ctx.heliusCount);
     case 'trading':
-      return renderTradeScreen('trade');
+      return await renderTradeScreen('trade');
     default:
       return buildHomePanel(ctx.heliusCount);
   }

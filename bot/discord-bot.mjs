@@ -127,7 +127,7 @@ async function clearSlashCommands() {
 
 async function updatePanel(screen = 'home') {
   if (!panelMessage) return;
-  const payload = renderScreen(screen, uiCtx());
+  const payload = await renderScreen(screen, uiCtx());
   await panelMessage.edit(payload);
 }
 
@@ -202,14 +202,14 @@ async function handleButton(interaction) {
 
   if (id === CID.REFRESH) {
     if (workerHandle) void workerHandle.resync();
-    await interaction.update(renderScreen('settings', uiCtx()));
+    await interaction.update(await renderScreen('settings', uiCtx()));
     await interaction.followUp({ content: '🔄 Surveillance actualisée.', ephemeral: true });
     return;
   }
 
   const screen = resolveScreen(id);
   if (screen) {
-    await interaction.update(renderScreen(screen, uiCtx()));
+    await interaction.update(await renderScreen(screen, uiCtx()));
   }
 }
 
@@ -232,7 +232,7 @@ async function handleSelect(interaction) {
   if (id === CID.SEL_PAUSE) {
     const g = loadStore().groups.find(x => x.id === value);
     setGroupActive(value, false);
-    await interaction.update(renderScreen('gr_pause', uiCtx()));
+    await interaction.update(await renderScreen('gr_pause', uiCtx()));
     await interaction.followUp({
       content: `⏸ Groupe **${g?.name || value}** en pause.`,
       ephemeral: true,
@@ -243,7 +243,7 @@ async function handleSelect(interaction) {
   if (id === CID.SEL_RESUME) {
     const g = loadStore().groups.find(x => x.id === value);
     setGroupActive(value, true);
-    await interaction.update(renderScreen('gr_resume', uiCtx()));
+    await interaction.update(await renderScreen('gr_resume', uiCtx()));
     await interaction.followUp({
       content: `▶ Groupe **${g?.name || value}** actif.`,
       ephemeral: true,

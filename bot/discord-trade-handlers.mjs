@@ -6,10 +6,13 @@ import {
 } from '../api/lib/trade-wallets.mjs';
 import { parseTradeButtonId } from '../api/lib/discord-trade.mjs';
 import { executeBuyTrade, executeSellTrade } from '../api/lib/trade-executor.mjs';
+import { solToLamports, formatSolLabel } from '../api/lib/trade-format.mjs';
+import { clearBalanceCache } from '../api/lib/wallet-balances.mjs';
 import {
   TCID,
   renderTradeScreen,
   cycleMultiWalletMode,
+  cyclePriorityPreset,
   parsePresetList,
   tradeBuyPresetsModal,
   tradeSellPresetsModal,
@@ -23,20 +26,26 @@ import {
   tradeCustomSellModal,
 } from './discord-trade-panel.mjs';
 
+async function updateTradeScreen(interaction, screen) {
+  await interaction.deferUpdate();
+  const payload = await renderTradeScreen(screen);
+  await interaction.editReply(payload);
+}
+
 export async function handleTradePanelButton(interaction) {
   const id = interaction.customId;
 
   if (id === TCID.TOGGLE) {
     const s = loadTradeSettings();
     patchTradeSettings({ tradingEnabled: !s.tradingEnabled });
-    await interaction.update(renderTradeScreen('trade'));
+    await updateTradeScreen(interaction, 'trade');
     return true;
   }
 
   if (id === TCID.BTNS) {
     const s = loadTradeSettings();
     patchTradeSettings({ showTradeButtonsOnAlerts: !s.showTradeButtonsOnAlerts });
-    await interaction.update(renderTradeScreen('trade'));
+    await updateTradeScreen(interaction, 'trade');
     return true;
   }
 
@@ -53,7 +62,22 @@ export async function handleTradePanelButton(interaction) {
     return true;
   }
   if (id === TCID.PRIO) {
+    const next = cyclePriorityPreset();
+    await updateTradeScreen(interaction, 'trade');
+    await interaction.followUp({
+      content: `⚡ Priority fee : **${next.name}** · **${formatSolLabel(next.sol)}**`,
+      ephemeral: true,
+    });
+    return true;
+  }
+  if (id === TCID.PRIO_CUSTOM) {
     await interaction.showModal(tradePrioModal());
+    return true;
+  }
+  if (id === TCID.REFRESH_BAL) {
+    clearBalanceCache();
+    await updateTradeScreen(interaction, 'trade');
+    await interaction.followUp({ content: '🔄 Soldes mis à jour.', ephemeral: true });
     return true;
   }
   if (id === TCID.WL_ADD) {
@@ -75,7 +99,7 @@ export async function handleTradePanelButton(interaction) {
 
   if (id === TCID.MULTI) {
     const mode = cycleMultiWalletMode();
-    await interaction.update(renderTradeScreen('trade'));
+    await updateTradeScreen(interaction, 'trade');
     await interaction.followUp({ content: `👛 Mode multi-wallet : **${mode}**`, ephemeral: true });
     return true;
   }
@@ -83,24 +107,24 @@ export async function handleTradePanelButton(interaction) {
   if (id === TCID.AUTO_TOGGLE) {
     const s = loadTradeSettings();
     patchTradeSettings({ autoBuy: { ...s.autoBuy, enabled: !s.autoBuy.enabled } });
-    await interaction.update(renderTradeScreen('trade_auto'));
+    await interaction.update(await renderTradeScreen('trade_auto'));
     return true;
   }
 
   if (id === TCID.MENU) {
-    await interaction.update(renderTradeScreen('trade'));
+    await updateTradeScreen(interaction, 'trade');
     return true;
   }
   if (id === TCID.WALLETS) {
-    await interaction.update(renderTradeScreen('trade_wallets'));
+    await updateTradeScreen(interaction, 'trade_wallets');
     return true;
   }
   if (id === TCID.WL_RM) {
-    await interaction.update(renderTradeScreen('trade_wl_rm'));
+    await interaction.update(await renderTradeScreen('trade_wl_rm'));
     return true;
   }
   if (id === TCID.AUTO) {
-    await interaction.update(renderTradeScreen('trade_auto'));
+    await interaction.update(await renderTradeScreen('trade_auto'));
     return true;
   }
 
@@ -121,9 +145,9 @@ export async function handleTradePanelSelect(interaction) {
     else ids.delete(walletId);
     if (ids.size >= all.length) ids = new Set();
     patchTradeSettings({ enabledWalletIds: [...ids] });
-    await interaction.update(renderTradeScreen('trade_wallets'));
+    await updateTradeScreen(interaction, 'trade_wallets');
     await interaction.followUp({
-      content: enabled ? `🟢 **${walletId}** activé pour le trading.` : `⚪ **${walletId}** désactivé.`,
+      content: enabled ? `🟢 **${walletId}** activé.` : `⚪ **${walletId}** désactivé.`,
       ephemeral: true,
     });
     return true;
@@ -131,7 +155,8 @@ export async function handleTradePanelSelect(interaction) {
 
   if (id === TCID.SEL_WL_RM) {
     removeTradeWallet(value);
-    await interaction.update(renderTradeScreen('trade_wl_rm'));
+    clearBalanceCache();
+    await interaction.update(await renderTradeScreen('trade_wl_rm'));
     await interaction.followUp({ content: '🗑 Wallet trading retiré.', ephemeral: true });
     return true;
   }
@@ -220,13 +245,13 @@ export async function handleTradeModal(interaction) {
     if (cid === TCID.MODAL_BUY_PRESETS) {
       const presets = parsePresetList(interaction.fields.getTextInputValue('presets'));
       patchTradeSettings({ buyPresetsSol: presets });
-      await interaction.editReply({ content: `✅ Presets achat : ${presets.join(', ')} SOL` });
+      await interaction.editReply({ content: `✅ Achats : ${presets.map(p => formatSolLabel(p)).join(' · ')}` });
       return true;
     }
     if (cid === TCID.MODAL_SELL_PRESETS) {
       const presets = parsePresetList(interaction.fields.getTextInputValue('presets'), true);
       patchTradeSettings({ sellPresetsPct: presets });
-      await interaction.editReply({ content: `✅ Presets vente : ${presets.join(', ')}%` });
+      await interaction.editReply({ content: `✅ Ventes : ${presets.join(', ')}%` });
       return true;
     }
     if (cid === TCID.MODAL_SLIP) {
@@ -236,17 +261,18 @@ export async function handleTradeModal(interaction) {
       return true;
     }
     if (cid === TCID.MODAL_PRIO) {
-      const lamports = parseInt(interaction.fields.getTextInputValue('lamports'), 10);
-      patchTradeSettings({ priorityFeeLamports: lamports });
-      await interaction.editReply({ content: `✅ Priorité : ${lamports} lamports` });
+      const sol = parseFloat(interaction.fields.getTextInputValue('sol'));
+      patchTradeSettings({ priorityFeeLamports: solToLamports(sol) });
+      await interaction.editReply({ content: `✅ Priority fee : **${formatSolLabel(sol)}**` });
       return true;
     }
     if (cid === TCID.MODAL_WL_ADD) {
       const label = interaction.fields.getTextInputValue('label').trim();
       const secret = interaction.fields.getTextInputValue('secret').trim();
       const w = addTradeWallet(label, secret);
+      clearBalanceCache();
       await interaction.editReply({
-        content: `✅ Wallet **${w.label}** enregistré (\`${w.pubkey.slice(0, 8)}…\`).`,
+        content: `✅ Wallet **${w.label}** · \`${w.pubkey.slice(0, 8)}…\``,
       });
       return true;
     }
@@ -254,7 +280,7 @@ export async function handleTradeModal(interaction) {
       const sol = parseFloat(interaction.fields.getTextInputValue('sol'));
       const s = loadTradeSettings();
       patchTradeSettings({ autoBuy: { ...s.autoBuy, solAmount: sol } });
-      await interaction.editReply({ content: `✅ Auto-buy : ${sol} SOL` });
+      await interaction.editReply({ content: `✅ Auto-buy : ${formatSolLabel(sol)}` });
       return true;
     }
     if (cid === TCID.MODAL_AUTO_MC) {
@@ -268,7 +294,7 @@ export async function handleTradeModal(interaction) {
     if (cid === TCID.MODAL_RESERVE) {
       const sol = parseFloat(interaction.fields.getTextInputValue('sol'));
       patchTradeSettings({ minSolReserve: sol });
-      await interaction.editReply({ content: `✅ Réserve SOL : ${sol}◎` });
+      await interaction.editReply({ content: `✅ Réserve : ${formatSolLabel(sol)}` });
       return true;
     }
   } catch (e) {
