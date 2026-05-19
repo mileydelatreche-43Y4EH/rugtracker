@@ -70,7 +70,7 @@ try {
   await sendWebhookPlain(
     WEBHOOK,
     '✅ Bundle Tracker (webhook) actif',
-    `Surveillance **${sum.activeCount}** wallet(s).\nLes achats arrivent ici avec boutons Axiom / Pump / Dex.\n_Modifie \`data/wallets.json\` ou importe un backup pour changer les wallets._`,
+    `Surveillance **${sum.activeCount}** wallet(s).\nLes achats arrivent ici avec boutons Axiom et Copier CA.\n_Modifie \`data/wallets.json\` ou importe un backup pour changer les wallets._`,
   );
   console.log('✅ Message de démarrage envoyé sur Discord');
 } catch (e) {

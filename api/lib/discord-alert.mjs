@@ -6,9 +6,7 @@ import {
 } from 'discord.js';
 import { resolveTokenImageUrl } from './token-meta.mjs';
 import { buildBuyAlertText, fmtTokenSym, fmtWalletGroup, fmtMcShort } from './alert-format.mjs';
-import { buildTradeButtonRows } from './discord-trade.mjs';
 import { pairButtonRows } from './discord-button-rows.mjs';
-import { loadTradeSettings } from './trade-settings.mjs';
 import { rememberAlertContext } from './alert-context.mjs';
 
 export const COPY_CA_PREFIX = 'bt:ca:';
@@ -49,12 +47,15 @@ export function buildBuyAlertContent({ w, hit, meta, axiomUrl }) {
 export function buildBuyEmbed({ w, hit, meta, sig }) {
   const mint = String(hit.mint || '').trim();
   const sym = fmtTokenSym(meta, mint);
+  const tokenName = String(meta?.name || '').trim();
   const embedColor =
     typeof w.groupColor === 'number' && w.groupColor >= 0 ? w.groupColor : 0x7c3aed;
 
+  const title = tokenName ? `🎯 ${sym} · ${tokenName}` : `🎯 ${sym}`;
+
   const embed = new EmbedBuilder()
     .setColor(embedColor)
-    .setTitle(`🎯 ${sym}`)
+    .setTitle(title)
     .setDescription(
       [
         `Wallet ${fmtWalletGroup(w)}`,
@@ -68,10 +69,7 @@ export function buildBuyEmbed({ w, hit, meta, sig }) {
     .setTimestamp();
 
   const img = resolveTokenImageUrl(mint, meta);
-  if (img) {
-    embed.setThumbnail(img);
-    embed.setAuthor({ name: sym.replace(/^\$/, '').toUpperCase(), iconURL: img });
-  }
+  if (img) embed.setThumbnail(img);
 
   return embed;
 }
@@ -90,8 +88,6 @@ export function buildBuyButtons(links, mint) {
   const m = String(mint || '').trim();
   const core = [
     linkBtn('⚡ Axiom', links.axiom),
-    linkBtn('🐸 Pump', links.pump),
-    linkBtn('📈 Dex', links.dex),
     new ButtonBuilder()
       .setCustomId(`${COPY_CA_PREFIX}${m}`)
       .setLabel('📋 Copier CA')
@@ -101,10 +97,7 @@ export function buildBuyButtons(links, mint) {
       .setLabel('🏠 Menu bot')
       .setStyle(ButtonStyle.Primary),
   ];
-  const rows = pairButtonRows(core, 3);
-  const tradeRows = buildTradeButtonRows(m);
-  if (tradeRows.length) rows.push(...tradeRows);
-  return clampAlertComponents(rows);
+  return clampAlertComponents(pairButtonRows(core, 2));
 }
 
 export function buildAlertComponents(links, mint) {
@@ -129,19 +122,11 @@ function buildAlertPayload(payload) {
   const links = buildBuyLinks(hit.mint, sig, axiomUrl);
   rememberAlertContext(hit.mint, { links, sig, sym: meta.sym, name: meta.name });
   const embed = buildBuyEmbed({ w, hit, meta, sig });
-  const content = buildBuyAlertContent({ w, hit, meta, axiomUrl });
-  const s = loadTradeSettings();
-  if (s.tradingEnabled && s.showTradeButtonsOnAlerts) {
-    embed.setFooter({
-      text: sig
-        ? `tx ${sig.slice(0, 12)}… · Trading ON — boutons ci-dessous`
-        : 'Trading ON — boutons Buy/Sell ci-dessous',
-    });
-  } else if (meta.mcUsd === 0 && !meta.name) {
+  if (meta.mcUsd === 0 && !meta.name) {
     embed.setFooter({ text: sig ? `tx ${sig.slice(0, 12)}…` : 'Mise à jour…' });
   }
   const components = buildBuyButtons(links, hit.mint);
-  return { content, embeds: [embed], components };
+  return { embeds: [embed], components };
 }
 
 export async function sendDiscordBuyAlert(channel, payload) {
@@ -155,7 +140,6 @@ export async function sendDiscordBuyAlert(channel, payload) {
       throw e;
     }
     return channel.send({
-      content: body.content,
       embeds: body.embeds,
       components: body.components.slice(0, 2),
     });
@@ -172,7 +156,6 @@ export async function enrichDiscordBuyAlert(message, payload) {
     const msg = String(e.message || e);
     if (msg.includes('COMPONENT') || msg.includes('50035')) {
       return message.edit({
-        content: body.content,
         embeds: body.embeds,
         components: body.components.slice(0, 2),
       });
