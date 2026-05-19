@@ -13,16 +13,19 @@ export async function postNtfy(topic, body, meta = {}) {
   params.set('priority', meta.priority || 'urgent');
   if (meta.tags) params.set('tags', meta.tags);
   if (meta.click) params.set('click', meta.click);
+  if (meta.attach) params.set('attach', meta.attach);
   const url = `https://ntfy.sh/${encodeURIComponent(topic)}?${params}`;
+  const headers = {
+    Title: ntfyHeaderAscii(meta.title),
+    Priority: meta.priority || 'urgent',
+    Tags: meta.tags || 'warning,money',
+    Click: meta.click || '',
+  };
+  if (meta.attach) headers.Attach = meta.attach;
   const r = await fetch(url, {
     method: 'POST',
     body,
-    headers: {
-      Title: ntfyHeaderAscii(meta.title),
-      Priority: meta.priority || 'urgent',
-      Tags: meta.tags || 'warning,money',
-      Click: meta.click || '',
-    },
+    headers,
   });
   if (!r.ok) {
     const errBody = await r.text().catch(() => '');

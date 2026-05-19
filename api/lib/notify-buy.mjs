@@ -5,7 +5,7 @@ import {
 } from './discord-alert.mjs';
 import { sendWebhookBuyAlert } from './discord-webhook.mjs';
 import { notifyBuyFast } from './notify-fast.mjs';
-import { fetchTokenMetaFast, minimalTokenMeta } from './token-meta.mjs';
+import { fetchTokenMetaFast, minimalTokenMeta, resolveTokenImageQuick } from './token-meta.mjs';
 import { maybeSnipeBuy, maybeSnipeSell } from './trade-executor.mjs';
 import { shouldSkipDuplicateChannelAlert } from './alert-dedupe.mjs';
 import { extractAnyBuyFromTx } from './solana.mjs';
@@ -66,6 +66,8 @@ export async function notifyBuyAlert(ctx, w, hit, sig, rpcCall, walletIndex = 0,
   const mint = hit.mint;
   const flashMeta = minimalTokenMeta(mint);
   const axiomInstant = axiomTradeUrlInstant(mint);
+  const imgQuick = await resolveTokenImageQuick(mint, flashMeta, 450);
+  if (imgQuick) flashMeta.imageUrl = imgQuick;
 
   let discordMsg = null;
   if (ctx.discordChannel) {

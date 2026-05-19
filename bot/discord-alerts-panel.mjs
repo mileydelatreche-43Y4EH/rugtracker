@@ -79,7 +79,7 @@ export function buildAlertsLivePanel(page = 0) {
         ...chunk.map(w =>
           abtn(
             alertToggleId(w.addr),
-            `${w.alertsOn ? 'ON' : 'OFF'} ${w.label}`.slice(0, 80),
+            `${w.alertsOn ? '🟢' : '⚫'} ${w.label}`.slice(0, 80),
             w.alertsOn ? ButtonStyle.Success : ButtonStyle.Secondary,
           ),
         ),
@@ -89,12 +89,12 @@ export function buildAlertsLivePanel(page = 0) {
 
   const nav = [];
   if (totalPages > 1) {
-    nav.push(abtn(ACID.PREV, '◀', ButtonStyle.Secondary));
-    nav.push(abtn(ACID.NEXT, '▶', ButtonStyle.Secondary));
+    nav.push(abtn(ACID.PREV, '⬅️', ButtonStyle.Secondary));
+    nav.push(abtn(ACID.NEXT, '➡️', ButtonStyle.Secondary));
   }
-  nav.push(abtn(ACID.ALL_ON, 'Tout ON', ButtonStyle.Success));
-  nav.push(abtn(ACID.ALL_OFF, 'Tout OFF', ButtonStyle.Danger));
-  nav.push(abtn(ACID.BACK_SETTINGS, 'Paramètres'));
+  nav.push(abtn(ACID.ALL_ON, '✅ Tout ON', ButtonStyle.Success));
+  nav.push(abtn(ACID.ALL_OFF, '⛔ Tout OFF', ButtonStyle.Danger));
+  nav.push(abtn(ACID.BACK_SETTINGS, '⚙️ Paramètres'));
   components.push(arow(...nav));
 
   return { embeds: [embed], components: components.slice(0, 5) };

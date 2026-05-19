@@ -7,6 +7,36 @@ export function resolveTokenImageUrl(mint, meta = {}) {
   return `https://dd.dexscreener.com/ds-data/tokens/solana/${m}.png`;
 }
 
+/** Image Pump.fun / Dex avant envoi alerte (timeout court). */
+export async function resolveTokenImageQuick(mint, meta = {}, timeoutMs = 450) {
+  const cached = String(meta?.imageUrl || '').trim();
+  if (cached.startsWith('http')) return cached;
+  const m = String(mint || '').trim();
+  if (!m) return resolveTokenImageUrl(m, meta);
+
+  const pumpP = (async () => {
+    try {
+      const r = await fetch(`https://frontend-api.pump.fun/coins/${encodeURIComponent(m)}`, {
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (!r.ok) return '';
+      const d = await r.json();
+      const u = String(d?.image_uri || d?.image || '').trim();
+      return u.startsWith('http') ? u : '';
+    } catch {
+      return '';
+    }
+  })();
+
+  const got = await Promise.race([
+    pumpP,
+    new Promise(resolve => {
+      setTimeout(() => resolve(''), timeoutMs);
+    }),
+  ]);
+  return got || resolveTokenImageUrl(m, meta);
+}
+
 export function minimalTokenMeta(mint) {
   const m = String(mint || '').trim();
   return {

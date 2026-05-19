@@ -37,6 +37,22 @@ function linkBtn(label, url) {
   return new ButtonBuilder().setLabel(label).setStyle(ButtonStyle.Link).setURL(url);
 }
 
+/** Texte sans markdown — lisible dans les toasts Windows Discord. */
+export function buildBuyAlertContent({ w, hit, meta, axiomUrl }) {
+  const mint = String(hit.mint || '').trim();
+  const sym = (meta.sym || mint.slice(0, 8)).toUpperCase();
+  const groupLine = w.groupEmoji && w.groupName ? `${w.groupEmoji} ${w.groupName}` : '—';
+  const link = axiomUrl || buildBuyLinks(mint, '', axiomUrl).axiom;
+  return [
+    link,
+    '',
+    `🎯 ${sym} · Wallet ${w.label || w.addr?.slice(0, 8)}`,
+    `Groupe ${groupLine} · ${venueLabel(hit.venue)} · MC ${fmtU(meta.mcUsd)}`,
+  ]
+    .join('\n')
+    .slice(0, 2000);
+}
+
 export function buildBuyEmbed({ w, hit, meta, sig }) {
   const mint = String(hit.mint || '').trim();
   const sym = (meta.sym || mint.slice(0, 8)).toUpperCase();
@@ -51,13 +67,13 @@ export function buildBuyEmbed({ w, hit, meta, sig }) {
     .setTitle(title)
     .setDescription(
       [
-        `**Wallet** · ${w.label || w.addr?.slice(0, 8)}`,
-        `**Groupe** · ${groupLine}`,
-        `**Venue** · ${venueLabel(hit.venue)}`,
-        `**MC** · ${fmtU(meta.mcUsd)}`,
+        `Wallet · ${w.label || w.addr?.slice(0, 8)}`,
+        `Groupe · ${groupLine}`,
+        `Venue · ${venueLabel(hit.venue)}`,
+        `MC · ${fmtU(meta.mcUsd)}`,
         '',
-        `**CA**`,
-        `\`\`\`\n${mint}\n\`\`\``,
+        `CA`,
+        mint,
       ].join('\n'),
     )
     .setFooter({ text: sig ? `tx ${sig.slice(0, 16)}…` : 'Bundle Tracker' })
@@ -65,7 +81,8 @@ export function buildBuyEmbed({ w, hit, meta, sig }) {
 
   const img = resolveTokenImageUrl(mint, meta);
   if (img) {
-    embed.setImage(img).setThumbnail(img);
+    embed.setThumbnail(img);
+    embed.setAuthor({ name: sym, iconURL: img });
   }
 
   return embed;
@@ -85,8 +102,8 @@ export function buildBuyButtons(links, mint) {
   const m = String(mint || '').trim();
   const row1 = new ActionRowBuilder().addComponents(
     linkBtn('⚡ Axiom', links.axiom),
-    linkBtn('🟢 Pump', links.pump),
-    linkBtn('📊 Dex', links.dex),
+    linkBtn('🐸 Pump', links.pump),
+    linkBtn('📈 Dex', links.dex),
   );
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -95,7 +112,7 @@ export function buildBuyButtons(links, mint) {
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId(ALERT_BOT_HOME)
-      .setLabel('☰ Menu')
+      .setLabel('🏠 Menu bot')
       .setStyle(ButtonStyle.Primary),
   );
   const rows = [row1, row2];
@@ -114,7 +131,7 @@ export function buildAlertMenuComponents(links, mint) {
     new ActionRowBuilder().addComponents(
       linkBtn('🔍 Solscan', links.solscan),
       linkBtn('🦅 Birdeye', links.birdeye),
-      linkBtn('📊 Dex', links.dex),
+      linkBtn('📈 Dex', links.dex),
     ),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -130,6 +147,7 @@ function buildAlertPayload(payload) {
   const links = buildBuyLinks(hit.mint, sig, axiomUrl);
   rememberAlertContext(hit.mint, { links, sig, sym: meta.sym, name: meta.name });
   const embed = buildBuyEmbed({ w, hit, meta, sig });
+  const content = buildBuyAlertContent({ w, hit, meta, axiomUrl });
   const s = loadTradeSettings();
   if (s.tradingEnabled && s.showTradeButtonsOnAlerts) {
     embed.setFooter({
@@ -141,7 +159,7 @@ function buildAlertPayload(payload) {
     embed.setFooter({ text: sig ? `tx ${sig.slice(0, 12)}…` : 'Mise à jour…' });
   }
   const components = buildBuyButtons(links, hit.mint);
-  return { embeds: [embed], components };
+  return { content, embeds: [embed], components };
 }
 
 export async function sendDiscordBuyAlert(channel, payload) {
@@ -155,6 +173,7 @@ export async function sendDiscordBuyAlert(channel, payload) {
       throw e;
     }
     return channel.send({
+      content: body.content,
       embeds: body.embeds,
       components: body.components.slice(0, 2),
     });
@@ -170,7 +189,11 @@ export async function enrichDiscordBuyAlert(message, payload) {
   } catch (e) {
     const msg = String(e.message || e);
     if (msg.includes('COMPONENT') || msg.includes('50035')) {
-      return message.edit({ embeds: body.embeds, components: body.components.slice(0, 2) });
+      return message.edit({
+        content: body.content,
+        embeds: body.embeds,
+        components: body.components.slice(0, 2),
+      });
     }
     throw e;
   }

@@ -1,6 +1,10 @@
 import { axiomTradeUrl } from './axiom.mjs';
 import { postNtfy, ntfyHeaderAscii } from './ntfy.mjs';
-import { buildPhoneNtfyPayload, fetchTokenMetaFast } from './token-meta.mjs';
+import {
+  buildPhoneNtfyPayload,
+  fetchTokenMetaFast,
+  resolveTokenImageUrl,
+} from './token-meta.mjs';
 
 const META_TIMEOUT_MS = Number(process.env.NTFY_META_TIMEOUT_MS || 1400);
 
@@ -30,9 +34,11 @@ export async function notifyBuyFast(topic, w, hit, rpcCall, walletIndex = 0) {
   const click = await clickP;
   const { title, body } = buildPhoneNtfyPayload(w, meta, mint);
 
+  const attach = resolveTokenImageUrl(mint, meta);
   await postNtfy(topic, body, {
     title: ntfyHeaderAscii(title),
     click,
+    attach: attach || undefined,
     tags: 'warning,money',
     priority: 'urgent',
   });

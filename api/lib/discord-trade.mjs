@@ -70,7 +70,7 @@ export function buildTradeButtonRows(mint) {
     ...buys.map((sol, i) =>
       new ButtonBuilder()
         .setCustomId(tradeBuyId(m, i))
-        .setLabel(`🟢 Buy ${formatSolLabel(sol)}`.slice(0, 80))
+        .setLabel(`💰 Buy ${formatSolLabel(sol)}`.slice(0, 80))
         .setStyle(ButtonStyle.Success),
     ),
     new ButtonBuilder()
@@ -83,12 +83,12 @@ export function buildTradeButtonRows(mint) {
     ...sells.map((pct, i) =>
       new ButtonBuilder()
         .setCustomId(tradeSellId(m, i))
-        .setLabel(`🔴 Sell ${pct}%`)
+        .setLabel(`📤 Sell ${pct}%`)
         .setStyle(ButtonStyle.Danger),
     ),
     new ButtonBuilder()
       .setCustomId(tradeMultiId(m))
-      .setLabel('👛 Multi-buy')
+      .setLabel('👥 Multi-buy')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId(tradeCustomSellId(m))

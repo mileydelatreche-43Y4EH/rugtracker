@@ -1,4 +1,5 @@
 import {
+  buildBuyAlertContent,
   buildBuyButtons,
   buildBuyEmbed,
   buildBuyLinks,
@@ -13,8 +14,10 @@ function webhookUrlWithWait(url) {
 export function buildBuyWebhookPayload({ w, hit, meta, sig, axiomUrl }) {
   const links = buildBuyLinks(hit.mint, sig, axiomUrl);
   const embed = buildBuyEmbed({ w, hit, meta, sig });
+  const content = buildBuyAlertContent({ w, hit, meta, axiomUrl });
   const components = buildBuyButtons(links, hit.mint);
   return {
+    content,
     embeds: [embed.toJSON()],
     components: components.map(r => r.toJSON()),
   };

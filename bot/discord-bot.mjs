@@ -495,6 +495,10 @@ client.once('ready', async () => {
   }
 
   notifyCtx.discordChannel = alertChannel;
+  notifyCtx.ntfyTopic = (process.env.NTFY_TOPIC || '').trim();
+  if (notifyCtx.ntfyTopic) {
+    console.log(`📱 ntfy actif (topic configuré) — clic notif → Axiom`);
+  }
 
   const worker = createBundleWorker({
     heliusKeys: HELIUS_KEYS,

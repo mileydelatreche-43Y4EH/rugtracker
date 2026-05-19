@@ -58,7 +58,7 @@ export async function buildSnipeMenu() {
 
   const components = [
     srow(sbtn(SCID.ADD, '➕ Ajouter wallet', ButtonStyle.Success)),
-    srow(sbtn(SCID.BACK_TRADE, '◀ Retour trading')),
+    srow(sbtn(SCID.BACK_TRADE, '⬅️ Trading')),
   ];
 
   const snipes = listSnipes();
@@ -110,7 +110,7 @@ export function buildSnipeAddSelect() {
       : '_Tous les wallets actifs sont déjà en sniping, ou aucun wallet surveillé._',
   );
 
-  const components = [srow(sbtn(SCID.MENU, '◀ Retour sniping'))];
+  const components = [srow(sbtn(SCID.MENU, '⬅️ Sniping'))];
   if (candidates.length) {
     components.unshift(
       new ActionRowBuilder().addComponents(
@@ -158,9 +158,9 @@ export function buildSnipeConfigPanel(watchAddr) {
       .join('\n'),
   );
 
-  const buyTogLabel = ab.enabled ? 'Désactiver auto-buy' : 'Activer auto-buy';
+  const buyTogLabel = ab.enabled ? '⛔ Stop buy' : '✅ Auto-buy';
   const buyTogStyle = ab.enabled ? ButtonStyle.Danger : ButtonStyle.Success;
-  const sellTogLabel = ab.autoSellEnabled ? 'Désactiver auto-sell' : 'Activer auto-sell';
+  const sellTogLabel = ab.autoSellEnabled ? '⛔ Stop sell' : '✅ Auto-sell';
   const sellTogStyle = ab.autoSellEnabled ? ButtonStyle.Danger : ButtonStyle.Success;
 
   return {
@@ -168,12 +168,12 @@ export function buildSnipeConfigPanel(watchAddr) {
     components: [
       srow(sbtn(`bt:snipe:tog:${watchAddr}`, buyTogLabel, buyTogStyle)),
       srow(
-        sbtn(`bt:snipe:buypct:${watchAddr}`, `% Achat ${ab.buyCopyPct}%`),
-        sbtn(`bt:snipe:sol:${watchAddr}`, 'Plafond SOL'),
-        sbtn(`bt:snipe:sellpct:${watchAddr}`, `% Vente ${ab.sellCopyPct}%`),
+        sbtn(`bt:snipe:buypct:${watchAddr}`, `📊 ${ab.buyCopyPct}%`),
+        sbtn(`bt:snipe:sol:${watchAddr}`, '💰 Plafond'),
+        sbtn(`bt:snipe:sellpct:${watchAddr}`, `📤 ${ab.sellCopyPct}%`),
       ),
       srow(sbtn(`bt:snipe:selltog:${watchAddr}`, sellTogLabel, sellTogStyle)),
-      srow(sbtn(SCID.MENU, '◀ Retour liste')),
+      srow(sbtn(SCID.MENU, '⬅️ Liste')),
     ],
   };
 }

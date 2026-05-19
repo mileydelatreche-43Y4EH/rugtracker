@@ -685,7 +685,7 @@ async function pushCloudBackup(manual) {
       body: JSON.stringify(payload),
     });
     if (!j.ok) {
-      setCloudSyncStatus(j.error || 'Échec cloud (Vercel KV ?)', false);
+      setCloudSyncStatus((j.error || 'Échec cloud') + (j.detail ? ' — ' + j.detail : ''), false);
       return;
     }
     touchLocalBackupMeta();
@@ -711,7 +711,7 @@ async function pullCloudBackupNow() {
     setCloudSyncStatus('Téléchargement…', null);
     const j = await fetchCloudApi('/api/cloud-sync?key=' + encodeURIComponent(key));
     if (!j.ok) {
-      setCloudSyncStatus(j.error || 'Cloud indisponible', false);
+      setCloudSyncStatus((j.error || 'Cloud indisponible') + (j.detail ? ' — ' + j.detail : ''), false);
       return;
     }
     if (!j.data || !j.data.groups?.length) {

@@ -26,13 +26,17 @@ RAILWAY_POLL_ONLY=0
 WORKER_WS_COMMITMENT=processed
 ENABLE_POLL_FALLBACK=0
 
+# ── Notifs PC clic → Axiom (app ntfy, topic secret) ──
+# NTFY_TOPIC=ton_topic_secret_long
+
 # ── Optionnel panneau ──
 # PANEL_MESSAGE_ID=
 
 # ═══════════════════════════════════════════════════════════════
-# Site Vercel (si déployé) — mêmes Redis + code secret cloud
+# Site Vercel — REST uniquement (Upstash → Connect → REST)
 # ═══════════════════════════════════════════════════════════════
-# REDIS_URL=rediss://default:...@skilled-kodiak-130431.upstash.io:6379
-# (Sur Vercel, tu peux aussi utiliser les vars auto si tu lies Upstash)
+# UPSTASH_REDIS_REST_URL=https://skilled-kodiak-130431.upstash.io
+# UPSTASH_REDIS_REST_TOKEN=... (œil, PAS read-only)
+# Code secret site = même CLOUD_SYNC_SECRET (bundle_tracker_sync)
 
 # Site : Paramètres → code secret = bundle_tracker_sync → Activer le cloud

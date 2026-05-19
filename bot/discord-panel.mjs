@@ -62,7 +62,7 @@ function row(...buttons) {
 }
 
 function backHome() {
-  return btn(CID.HOME, 'Menu', '🏠');
+  return btn(CID.HOME, 'Accueil', '🏠');
 }
 
 function panelEmbed(title, description) {
@@ -82,7 +82,7 @@ export async function buildHomePanel() {
     [
       `▶ **${tracked}** wallet(s) suivis · **${groups}** groupe(s)`,
       '',
-      '**👛 Tes wallets**',
+      '**💼 Tes wallets**',
       walletBlock.slice(0, 3500),
     ].join('\n'),
   );
@@ -90,11 +90,11 @@ export async function buildHomePanel() {
   return {
     embeds: [embed],
     components: [
-      row(btn(CID.WALLETS, 'Wallets', '👛'), btn(CID.GROUPS, 'Groupes', '📁')),
+      row(btn(CID.WALLETS, 'Wallets', '💼'), btn(CID.GROUPS, 'Groupes', '🗂️')),
       row(
-        btn(CID.STATUS, 'Statut', '📊'),
+        btn(CID.STATUS, 'Statut', '📡'),
         btn(CID.SETTINGS, 'Paramètres', '⚙️'),
-        btn(CID.HOME_BAL, 'Rafraîchir soldes', '🔄'),
+        btn(CID.HOME_BAL, 'Soldes', '💰'),
       ),
     ],
   };
@@ -102,7 +102,7 @@ export async function buildHomePanel() {
 
 export function buildWalletsMenu() {
   const sum = storeSummary();
-  const embed = panelEmbed('👛 Wallets', `**${sum.activeCount}** wallet(s) surveillé(s).`);
+  const embed = panelEmbed('💼 Wallets', `**${sum.activeCount}** wallet(s) surveillé(s).`);
 
   return {
     embeds: [embed],
@@ -110,9 +110,9 @@ export function buildWalletsMenu() {
       row(
         btn(CID.WL_LIST, 'Liste', '📋'),
         btn(CID.WL_ADD, 'Ajouter', '➕'),
-        btn(CID.WL_RM, 'Retirer', '➖'),
+        btn(CID.WL_RM, 'Retirer', '🗑️'),
       ),
-      row(btn(CID.IMPORT, 'Importer .json', '📥'), btn(CID.EXPORT, 'Exporter .json', '💾')),
+      row(btn(CID.IMPORT, 'Import .json', '📥'), btn(CID.EXPORT, 'Export .json', '📤')),
       row(backHome()),
     ],
   };
@@ -131,7 +131,7 @@ export function buildWalletsList() {
 
   return {
     embeds: [embed],
-    components: [row(btn(CID.WALLETS, 'Retour', '◀'), backHome())],
+    components: [row(btn(CID.WALLETS, 'Retour', '⬅️'), backHome())],
   };
 }
 
@@ -178,10 +178,10 @@ export function buildGroupsMenu() {
     components: [
       row(
         btn(CID.GR_LIST, 'Liste', '📋'),
-        btn(CID.GR_ADD, 'Créer', '➕'),
-        btn(CID.GR_PAUSE, 'Pause', '⏸'),
+        btn(CID.GR_ADD, 'Créer', '✨'),
+        btn(CID.GR_PAUSE, 'Pause', '⏸️'),
       ),
-      row(btn(CID.GR_RESUME, 'Reprendre', '▶')),
+      row(btn(CID.GR_RESUME, 'Reprendre', '▶️')),
       row(backHome()),
     ],
   };
@@ -193,7 +193,7 @@ export function buildGroupsList() {
 
   return {
     embeds: [embed],
-    components: [row(btn(CID.GROUPS, 'Retour', '◀'), backHome())],
+    components: [row(btn(CID.GROUPS, 'Retour', '⬅️'), backHome())],
   };
 }
 
@@ -261,7 +261,8 @@ export function buildSettingsPanel(heliusCount) {
       `⚡ Délai meta alertes : ~${metaMs} ms`,
       '⚡ Détection : WebSocket Helius instantané (`processed`)',
       '',
-      '_Notifications PC : active les notifs Discord pour ce serveur._',
+      '_Notifs Windows : le clic ouvre Discord (pas Axiom direct). Le lien Axiom est en haut du message — ou bouton ⚡ Axiom._',
+      '_Clic direct Axiom : configure **NTFY_TOPIC** sur Railway + app ntfy (même topic)._',
     ].join('\n'),
   );
 
@@ -269,8 +270,8 @@ export function buildSettingsPanel(heliusCount) {
     embeds: [embed],
     components: [
       row(btn(CID.ALERTS_LIVE, 'Alertes live', '🔔')),
-      row(btn(CID.TRADING, 'Trading Buy/Sell', '💹')),
-      row(btn(CID.TEST, 'Test alerte', '🧪'), btn(CID.REFRESH, 'Actualiser', '🔄')),
+      row(btn(CID.TRADING, 'Trading', '💹')),
+      row(btn(CID.TEST, 'Test alerte', '🧪'), btn(CID.REFRESH, 'Resync', '🔃')),
       row(backHome()),
     ],
   };
