@@ -18,7 +18,6 @@ import {
   removeWallet,
   addGroup,
   setGroupActive,
-  importBackup,
   storeSummary,
   getActiveWallets,
   loadStore,
@@ -32,7 +31,6 @@ import {
   resolveScreen,
   walletAddModal,
   groupAddModal,
-  importModal,
   exportAttachment,
   buildHomePanel,
   buildWalletRemoveSelect,
@@ -58,12 +56,15 @@ import {
   dismissEphemeral,
   showEphemeralError,
   replyEphemeralBrief,
+  safePanelUpdate,
+  isUnknownInteraction,
 } from './discord-ui.mjs';
 import { clearBalanceCache } from '../api/lib/wallet-balances.mjs';
 import {
   handleAlertsPanelButton,
   isAlertsPanelId,
 } from './discord-alerts-handlers.mjs';
+import { startJsonFileImport, handleJsonImportMessage } from './discord-import.mjs';
 
 function loadEnvFile() {
   const p = new URL('../.env', import.meta.url);
@@ -125,7 +126,13 @@ loadTradeSettings();
 
 const uiCtx = () => ({ heliusCount: HELIUS_KEYS.length, channelId: CHANNEL_ID });
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
+});
 let alertChannel = null;
 let panelMessage = null;
 let notifyCtx = { discordChannel: null, ntfyTopic: '' };
@@ -222,7 +229,7 @@ async function handleButton(interaction) {
     return;
   }
   if (id === CID.IMPORT) {
-    await interaction.showModal(importModal());
+    await startJsonFileImport(interaction);
     return;
   }
 
@@ -249,29 +256,19 @@ async function handleButton(interaction) {
 
   if (id === CID.REFRESH) {
     if (workerHandle) void workerHandle.resync();
-    await interaction.update(await renderScreen('settings', uiCtx()));
+    await safePanelUpdate(interaction, () => renderScreen('settings', uiCtx()));
     return;
   }
 
   if (id === CID.HOME_BAL) {
     clearBalanceCache();
-    try {
-      await interaction.update(await renderScreen('home', uiCtx()));
-    } catch (e) {
-      console.error('Rafraîchir soldes', e);
-      await showEphemeralError(interaction, e.message || String(e));
-    }
+    await safePanelUpdate(interaction, () => renderScreen('home', uiCtx()));
     return;
   }
 
   const screen = resolveScreen(id);
   if (screen) {
-    try {
-      await interaction.update(await renderScreen(screen, uiCtx()));
-    } catch (e) {
-      console.error('Panneau', id, e);
-      await showEphemeralError(interaction, e.message || String(e));
-    }
+    await safePanelUpdate(interaction, () => renderScreen(screen, uiCtx()));
   }
 }
 
@@ -284,19 +281,19 @@ async function handleSelect(interaction) {
 
   if (id === CID.SEL_RM_WL) {
     removeWallet(value);
-    await interaction.update(buildWalletRemoveSelect());
+    await safePanelUpdate(interaction, () => buildWalletRemoveSelect());
     return;
   }
 
   if (id === CID.SEL_PAUSE) {
     setGroupActive(value, false);
-    await interaction.update(await renderScreen('gr_pause', uiCtx()));
+    await safePanelUpdate(interaction, () => renderScreen('gr_pause', uiCtx()));
     return;
   }
 
   if (id === CID.SEL_RESUME) {
     setGroupActive(value, true);
-    await interaction.update(await renderScreen('gr_resume', uiCtx()));
+    await safePanelUpdate(interaction, () => renderScreen('gr_resume', uiCtx()));
   }
 }
 
@@ -333,19 +330,6 @@ async function handleModal(interaction) {
       return;
     }
 
-    if (interaction.customId === CID.MODAL_IMPORT) {
-      const raw = interaction.fields.getTextInputValue('json').trim();
-      let data;
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        throw new Error('JSON invalide — exporte depuis le site (Backup groupes).');
-      }
-      const payload = data.groups ? data : { groups: data };
-      importBackup(payload);
-      void updatePanel('home').catch(() => {});
-      await dismissEphemeral(interaction);
-    }
   } catch (e) {
     await showEphemeralError(interaction, e.message || String(e));
   }
@@ -429,6 +413,7 @@ async function handleInteraction(interaction) {
     else if (interaction.isStringSelectMenu()) await handleSelect(interaction);
     else if (interaction.isModalSubmit()) await handleModal(interaction);
   } catch (e) {
+    if (isUnknownInteraction(e)) return;
     const msg = e.message || String(e);
     if (interaction.isModalSubmit()) {
       if (interaction.deferred) {
@@ -502,6 +487,17 @@ client.once('ready', async () => {
 
 client.on('interactionCreate', interaction => {
   void handleInteraction(interaction);
+});
+
+client.on('messageCreate', message => {
+  void handleJsonImportMessage(message, {
+    channelId: CHANNEL_ID,
+    isAdmin,
+    onDone: async () => {
+      if (workerHandle) void workerHandle.resync();
+      void updatePanel('home').catch(() => {});
+    },
+  });
 });
 
 console.log(`Bundle Tracker · ${HELIUS_KEYS.length} clé(s) Helius · salon ${CHANNEL_ID}`);

@@ -50,7 +50,6 @@ export const CID = {
   SEL_RESUME: 'bt:sel:resume',
   MODAL_WL_ADD: 'bt:modal:wladd',
   MODAL_GR_ADD: 'bt:modal:gradd',
-  MODAL_IMPORT: 'bt:modal:import',
 };
 
 function btn(id, label, emoji) {
@@ -113,7 +112,7 @@ export function buildWalletsMenu() {
         btn(CID.WL_ADD, 'Ajouter', '➕'),
         btn(CID.WL_RM, 'Retirer', '➖'),
       ),
-      row(btn(CID.IMPORT, 'Importer JSON', '📥'), btn(CID.EXPORT, 'Exporter JSON', '💾')),
+      row(btn(CID.IMPORT, 'Importer .json', '📥'), btn(CID.EXPORT, 'Exporter .json', '💾')),
       row(backHome()),
     ],
   };
@@ -326,22 +325,6 @@ export function groupAddModal() {
           .setStyle(TextInputStyle.Short)
           .setRequired(false)
           .setValue('🎯'),
-      ),
-    );
-}
-
-export function importModal() {
-  return new ModalBuilder()
-    .setCustomId(CID.MODAL_IMPORT)
-    .setTitle('Importer backup JSON')
-    .addComponents(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('json')
-          .setLabel('JSON (export site)')
-          .setStyle(TextInputStyle.Paragraph)
-          .setRequired(true)
-          .setMaxLength(4000),
       ),
     );
 }

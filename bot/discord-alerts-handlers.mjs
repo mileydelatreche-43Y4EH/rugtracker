@@ -9,6 +9,7 @@ import {
   parseAlertToggleId,
   PAGE_SIZE,
 } from './discord-alerts-panel.mjs';
+import { safePanelUpdate } from './discord-ui.mjs';
 
 const pageState = new Map();
 
@@ -40,20 +41,20 @@ export async function handleAlertsPanelButton(interaction) {
 
   if (id === ACID.ALL_ON) {
     setAllWalletAlerts(true);
-    await interaction.update(buildAlertsLivePanel(getPage(interaction)));
+    await safePanelUpdate(interaction, () => buildAlertsLivePanel(getPage(interaction)));
     return true;
   }
 
   if (id === ACID.ALL_OFF) {
     setAllWalletAlerts(false);
-    await interaction.update(buildAlertsLivePanel(getPage(interaction)));
+    await safePanelUpdate(interaction, () => buildAlertsLivePanel(getPage(interaction)));
     return true;
   }
 
   if (id === ACID.PREV) {
     const p = Math.max(0, getPage(interaction) - 1);
     setPage(interaction, p);
-    await interaction.update(buildAlertsLivePanel(p));
+    await safePanelUpdate(interaction, () => buildAlertsLivePanel(p));
     return true;
   }
 
@@ -61,21 +62,20 @@ export async function handleAlertsPanelButton(interaction) {
     const maxPage = Math.max(0, Math.ceil(getAllWalletsFlat().length / PAGE_SIZE) - 1);
     const p = Math.min(getPage(interaction) + 1, maxPage);
     setPage(interaction, p);
-    await interaction.update(buildAlertsLivePanel(p));
+    await safePanelUpdate(interaction, () => buildAlertsLivePanel(p));
     return true;
   }
 
   const addr = parseAlertToggleId(id);
   if (addr) {
     toggleWalletAlerts(addr);
-    await interaction.update(buildAlertsLivePanel(getPage(interaction)));
+    await safePanelUpdate(interaction, () => buildAlertsLivePanel(getPage(interaction)));
     return true;
   }
 
   if (id === ACID.MENU) {
     setPage(interaction, 0);
-    const payload = buildAlertsLivePanel(0);
-    await interaction.update(payload);
+    await safePanelUpdate(interaction, () => buildAlertsLivePanel(0));
     return true;
   }
 

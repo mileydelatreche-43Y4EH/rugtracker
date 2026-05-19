@@ -269,22 +269,59 @@ export function removeWallet(addr) {
   return saveStore(store);
 }
 
-export function importBackup(payload) {
-  if (!payload?.groups?.length) throw new Error('Backup invalide');
-  const store = {
+function normalizeWalletEntry(w) {
+  if (!w || typeof w !== 'object') return null;
+  const addr = String(w.addr || w.address || w.pubkey || '').trim();
+  if (addr.length < 32) return null;
+  return {
+    addr,
+    label: String(w.label || w.name || addr.slice(0, 8)).trim(),
+    alertsOn: w.alertsOn !== false,
+  };
+}
+
+/** Accepte export site (`v` + `groups`), export bot (`version`), ou tableau de groupes. */
+export function normalizeBackupPayload(raw) {
+  let data = raw;
+  if (typeof raw === 'string') {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw new Error('JSON illisible — utilise le fichier .json exporté (site ou bot).');
+    }
+  }
+  if (!data || typeof data !== 'object') {
+    throw new Error('Fichier vide ou invalide.');
+  }
+
+  let groups = data.groups;
+  if (!groups && Array.isArray(data)) groups = data;
+
+  if (!Array.isArray(groups) || !groups.length) {
+    throw new Error(
+      'Aucun groupe trouvé — exporte depuis le site (Backup groupes) ou le bot (Exporter .json).',
+    );
+  }
+
+  return {
     version: 1,
-    groups: payload.groups.map(g => ({
+    groups: groups.map(g => ({
       id: g.id || `g_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       name: g.name || 'Groupe',
       emoji: g.emoji || '🎯',
       active: g.active !== false,
       color: g.color,
-      wallets: (g.wallets || []).filter(w => w?.addr).map(w => ({
-        addr: String(w.addr).trim(),
-        label: w.label || String(w.addr).slice(0, 8),
-      })),
+      wallets: (g.wallets || []).map(normalizeWalletEntry).filter(Boolean),
     })),
   };
+}
+
+export function importBackup(payload) {
+  const store = normalizeBackupPayload(payload);
+  const totalWallets = store.groups.reduce((n, g) => n + g.wallets.length, 0);
+  if (!totalWallets) {
+    throw new Error('Le fichier a des groupes mais 0 wallet — vérifie l’export.');
+  }
   return saveStore(store);
 }
 

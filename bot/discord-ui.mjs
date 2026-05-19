@@ -1,6 +1,29 @@
 /** Durée avant suppression auto des éphémères (trade, erreurs, copier CA). */
 export const EPHEMERAL_TTL_MS = Number(process.env.EPHEMERAL_TTL_MS || 3000);
 
+export function isUnknownInteraction(err) {
+  const code = err?.code ?? err?.rawError?.code;
+  return code === 10062 || code === 40060;
+}
+
+/** Met à jour le panneau épinglé sans crash si le clic a expiré (>3 s). */
+export async function safePanelUpdate(interaction, getPayload) {
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferUpdate();
+    }
+    const payload = typeof getPayload === 'function' ? await getPayload() : getPayload;
+    await interaction.editReply(payload);
+    return true;
+  } catch (e) {
+    if (isUnknownInteraction(e)) {
+      console.warn('Interaction expirée — reclique sur le bouton');
+      return false;
+    }
+    throw e;
+  }
+}
+
 /** Ferme la réponse éphémère (pas de spam dans le salon). */
 export async function dismissEphemeral(interaction) {
   try {
@@ -30,8 +53,10 @@ export async function showEphemeralError(interaction, message) {
       await interaction.reply({ content: text, ephemeral: true });
     }
     scheduleEphemeralDismiss(interaction);
-  } catch {
-    /* ignore */
+  } catch (e) {
+    if (!isUnknownInteraction(e)) {
+      /* ignore autres */
+    }
   }
 }
 
