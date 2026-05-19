@@ -5,7 +5,6 @@ import {
   heliusRpcUrl,
   rpc,
   extractAnyBuyFromTx,
-  extractAnySellFromTx,
   extractQuickBuyFromLogs,
   normalizeHeliusWsTransaction,
   PUMP,
@@ -13,7 +12,7 @@ import {
 } from '../api/lib/solana.mjs';
 import { getActiveWallets, onStoreChange } from '../api/lib/wallet-store.mjs';
 
-export function createBundleWorker({ heliusKeys, onBuy, onSell, getWallets = getActiveWallets }) {
+export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWallets }) {
   if (!heliusKeys?.length) throw new Error('Aucune clé Helius');
 
   let rpcRound = 0;
@@ -123,17 +122,7 @@ export function createBundleWorker({ heliusKeys, onBuy, onSell, getWallets = get
     const wi = walletIndexByAddr.get(w.addr) ?? 0;
     try {
       const buyHit = extractAnyBuyFromTx(tx, w.addr);
-      if (buyHit) {
-        await emitBuy(w, buyHit, sig, wi, detectedAt);
-        return;
-      }
-      const sellHit = extractAnySellFromTx(tx, w.addr);
-      if (sellHit && onSell) {
-        console.log(
-          `💸 vente ${w.label} · ${sellHit.mint.slice(0, 8)}… · ~${Math.round(sellHit.sellPct)}%`,
-        );
-        void onSell(w, sellHit, { sig, rpcCall, walletIndex: wi });
-      }
+      if (buyHit) await emitBuy(w, buyHit, sig, wi, detectedAt);
     } catch (e) {
       console.warn('handleTxDirect', w.label, e.message || e);
       seenSigs.delete(sk);
@@ -144,7 +133,7 @@ export function createBundleWorker({ heliusKeys, onBuy, onSell, getWallets = get
     const s = String(logs || '');
     const pump = s.includes(PUMP) || s.includes(PUMP_SWAP);
     if (!pump) return false;
-    return s.includes('Instruction: Buy') || s.includes('Instruction: Sell');
+    return s.includes('Instruction: Buy');
   }
 
   async function handleSig(w, sig, { fromWarm = false, logs, detectedAt } = {}) {
@@ -179,18 +168,7 @@ export function createBundleWorker({ heliusKeys, onBuy, onSell, getWallets = get
         return;
       }
       const buyHit = extractAnyBuyFromTx(tx, w.addr);
-      if (buyHit) {
-        await emitBuy(w, buyHit, sig, wi, tDetect);
-        return;
-      }
-
-      const sellHit = extractAnySellFromTx(tx, w.addr);
-      if (!sellHit || !onSell) return;
-
-      console.log(
-        `💸 vente ${w.label} · ${sellHit.mint.slice(0, 8)}… · ~${Math.round(sellHit.sellPct)}% · ${sellHit.venue || 'curve'}`,
-      );
-      void onSell(w, sellHit, { sig, rpcCall, walletIndex: wi });
+      if (buyHit) await emitBuy(w, buyHit, sig, wi, tDetect);
     } catch (e) {
       console.warn('handleSig', w.label, e.message || e);
       if (!fromWarm) seenSigs.delete(sk);

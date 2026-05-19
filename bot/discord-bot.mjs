@@ -12,7 +12,7 @@ import {
 } from '../api/lib/discord-alert.mjs';
 import { fetchTokenMetaFast } from '../api/lib/token-meta.mjs';
 import { axiomTradeUrl } from '../api/lib/axiom.mjs';
-import { notifyBuyAlert, notifySellAlert } from '../api/lib/notify-buy.mjs';
+import { notifyBuyAlert } from '../api/lib/notify-buy.mjs';
 import {
   addWallet,
   removeWallet,
@@ -40,23 +40,6 @@ import {
   buildHomePanel,
   buildWalletRemoveSelect,
 } from './discord-panel.mjs';
-import { isTradeButtonId } from '../api/lib/discord-trade.mjs';
-import { loadTradeSettings } from '../api/lib/trade-settings.mjs';
-import {
-  handleTradePanelButton,
-  handleTradePanelSelect,
-  handleTradeAlertButton,
-  handleTradeModal,
-  isTradePanelId,
-  isTradeModalId,
-} from './discord-trade-handlers.mjs';
-import {
-  handleSnipePanelButton,
-  handleSnipePanelSelect,
-  handleSnipeModal,
-  isSnipePanelId,
-  isSnipeModalId,
-} from './discord-snipe-handlers.mjs';
 import {
   dismissEphemeral,
   showEphemeralError,
@@ -67,7 +50,6 @@ import {
   safePanelUpdate,
   isUnknownInteraction,
 } from './discord-ui.mjs';
-import { clearBalanceCache } from '../api/lib/wallet-balances.mjs';
 import {
   handleAlertsPanelButton,
   isAlertsPanelId,
@@ -131,7 +113,6 @@ if (!HELIUS_KEYS.length) process.exit(1);
 ensureRailwayDataDir();
 await hydrateFromCloud();
 loadStore();
-loadTradeSettings();
 await logWalletStoreStatus();
 
 const uiCtx = () => ({ heliusCount: HELIUS_KEYS.length, channelId: CHANNEL_ID });
@@ -228,14 +209,6 @@ async function handleButton(interaction) {
     if (await handleAlertsPanelButton(interaction)) return;
   }
 
-  if (isSnipePanelId(id)) {
-    if (await handleSnipePanelButton(interaction)) return;
-  }
-
-  if (isTradePanelId(id)) {
-    if (await handleTradePanelButton(interaction)) return;
-  }
-
   if (id === CID.WL_ADD) {
     await interaction.showModal(walletAddModal());
     return;
@@ -250,14 +223,8 @@ async function handleButton(interaction) {
   }
 
   if (id === CID.TEST) {
-    await interaction.deferReply({ ephemeral: true });
-    try {
-      await sendTestAlert();
-      await dismissEphemeral(interaction);
-    } catch (e) {
-      console.error('Test alerte', e);
-      await showEphemeralError(interaction, `Test alerte : ${e.message || e}`);
-    }
+    await replyEphemeralBrief(interaction, '🧪 Alerte test envoyée dans le salon');
+    void sendTestAlert().catch(e => console.error('Test alerte', e.message || e));
     return;
   }
 
@@ -273,19 +240,13 @@ async function handleButton(interaction) {
 
   if (id === CID.REFRESH) {
     if (workerHandle) void workerHandle.resync();
-    await safePanelUpdate(interaction, () => renderScreen('settings', uiCtx()));
-    return;
-  }
-
-  if (id === CID.HOME_BAL) {
-    clearBalanceCache();
-    await safePanelUpdate(interaction, () => renderScreen('home', uiCtx()));
+    await safePanelUpdate(interaction, renderScreen('settings', uiCtx()));
     return;
   }
 
   const screen = resolveScreen(id);
   if (screen) {
-    await safePanelUpdate(interaction, () => renderScreen(screen, uiCtx()));
+    await safePanelUpdate(interaction, renderScreen(screen, uiCtx()));
   }
 }
 
@@ -293,36 +254,25 @@ async function handleSelect(interaction) {
   const id = interaction.customId;
   const value = interaction.values[0];
 
-  if (await handleSnipePanelSelect(interaction)) return;
-  if (await handleTradePanelSelect(interaction)) return;
-
   if (id === CID.SEL_RM_WL) {
     removeWallet(value);
-    await safePanelUpdate(interaction, () => buildWalletRemoveSelect());
+    await safePanelUpdate(interaction, buildWalletRemoveSelect());
     return;
   }
 
   if (id === CID.SEL_PAUSE) {
     setGroupActive(value, false);
-    await safePanelUpdate(interaction, () => renderScreen('gr_pause', uiCtx()));
+    await safePanelUpdate(interaction, renderScreen('gr_pause', uiCtx()));
     return;
   }
 
   if (id === CID.SEL_RESUME) {
     setGroupActive(value, true);
-    await safePanelUpdate(interaction, () => renderScreen('gr_resume', uiCtx()));
+    await safePanelUpdate(interaction, renderScreen('gr_resume', uiCtx()));
   }
 }
 
 async function handleModal(interaction) {
-  if (isSnipeModalId(interaction.customId)) {
-    if (await handleSnipeModal(interaction)) return;
-  }
-
-  if (isTradeModalId(interaction.customId)) {
-    if (await handleTradeModal(interaction)) return;
-  }
-
   await interaction.deferReply({ ephemeral: true });
 
   try {
@@ -376,19 +326,6 @@ async function handleInteraction(interaction) {
       interaction,
       `**Contrat (CA)**\n\`\`\`\n${mint}\n\`\`\``,
     );
-    return;
-  }
-
-  if (interaction.isButton() && isTradeButtonId(interaction.customId)) {
-    if (!isAdmin(interaction.user.id)) {
-      await deny(interaction);
-      return;
-    }
-    try {
-      await handleTradeAlertButton(interaction);
-    } catch (e) {
-      await showEphemeralError(interaction, e.message || String(e));
-    }
     return;
   }
 
@@ -504,9 +441,6 @@ client.once('ready', async () => {
     heliusKeys: HELIUS_KEYS,
     onBuy: async (w, hit, { sig, rpcCall, walletIndex, detectedAt }) => {
       await notifyBuyAlert(notifyCtx, w, hit, sig, rpcCall, walletIndex, { detectedAt });
-    },
-    onSell: async (w, hit, { sig }) => {
-      await notifySellAlert(notifyCtx, w, hit, sig);
     },
   });
   workerHandle = await worker.start();

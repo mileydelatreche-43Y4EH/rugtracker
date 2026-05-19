@@ -48,32 +48,11 @@ function countWallets(groups) {
 
 export async function buildBotCloudPayload() {
   const { loadStore } = await import('./wallet-store.mjs');
-  const { loadTradeSettings } = await import('./trade-settings.mjs');
   const store = loadStore();
-  let tradeWallets = { version: 1, wallets: [] };
-  try {
-    const { readFileSync, existsSync } = await import('fs');
-    const { resolvePersistPath } = await import('./data-paths.mjs');
-    const { dirname, join } = await import('path');
-    const { fileURLToPath } = await import('url');
-    const __dir = dirname(fileURLToPath(import.meta.url));
-    const p = resolvePersistPath(
-      'trade-wallets.json',
-      'TRADE_WALLETS_PATH',
-      join(__dir, '../../data/trade-wallets.json'),
-    );
-    if (existsSync(p)) {
-      tradeWallets = JSON.parse(readFileSync(p, 'utf8'));
-    }
-  } catch {
-    /* ignore */
-  }
   return {
     v: 1,
     exportedAt: new Date().toISOString(),
     groups: store.groups,
-    tradeSettings: await loadTradeSettings(),
-    tradeWallets,
   };
 }
 
@@ -129,26 +108,6 @@ export async function hydrateFromCloud() {
 
     importBackup(data);
 
-    if (data.tradeSettings && typeof data.tradeSettings === 'object') {
-      const { saveTradeSettings } = await import('./trade-settings.mjs');
-      saveTradeSettings(data.tradeSettings);
-    }
-
-    if (data.tradeWallets?.wallets) {
-      const { writeFileSync, mkdirSync } = await import('fs');
-      const { dirname, join } = await import('path');
-      const { fileURLToPath } = await import('url');
-      const { resolvePersistPath } = await import('./data-paths.mjs');
-      const __dir = dirname(fileURLToPath(import.meta.url));
-      const p = resolvePersistPath(
-        'trade-wallets.json',
-        'TRADE_WALLETS_PATH',
-        join(__dir, '../../data/trade-wallets.json'),
-      );
-      mkdirSync(dirname(p), { recursive: true });
-      writeFileSync(p, JSON.stringify(data.tradeWallets, null, 2), 'utf8');
-    }
-
     console.log(`☁ Restauré depuis cloud · ${cloudN} wallet(s) · ${cloudAt || '?'}`);
     return true;
   } catch (e) {
@@ -177,7 +136,7 @@ export function logCloudPersistStatus() {
 }
 
 export async function logWalletStoreStatus() {
-  const { loadStore, getActiveWallets, storeSummary } = await import('./wallet-store.mjs');
+  const { loadStore, storeSummary } = await import('./wallet-store.mjs');
   const p = (await import('./data-paths.mjs')).resolvePersistPath(
     'wallets.json',
     'WALLET_STORE_PATH',
@@ -185,6 +144,7 @@ export async function logWalletStoreStatus() {
   );
   const store = loadStore();
   const sum = storeSummary(store);
+  const total = store.groups.reduce((n, g) => n + g.wallets.length, 0);
   console.log(`📂 Fichier wallets : ${p}`);
-  console.log(`👛 ${sum.activeCount} wallet(s) actif(s) / ${sum.total} total`);
+  console.log(`👛 ${sum.activeCount} wallet(s) actif(s) / ${total} total`);
 }

@@ -20,6 +20,6 @@ export function parseHeliusKeysFromEnv() {
 
 export function primaryHeliusRpcUrl() {
   const keys = parseHeliusKeysFromEnv();
-  if (!keys.length) throw new Error('HELIUS_API_KEYS requis pour le trading');
+  if (!keys.length) throw new Error('HELIUS_API_KEYS requis pour la surveillance');
   return heliusHttpRpcUrl(keys[0]);
 }

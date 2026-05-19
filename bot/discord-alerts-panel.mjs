@@ -2,6 +2,8 @@ import { ActionRowBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
 import { getAllWalletsFlat, alertsLiveSummary } from '../api/lib/wallet-store.mjs';
 import {
   UI_COLORS,
+  ICO,
+  L,
   uiBtn,
   uiRow,
   uiRowsPair,
@@ -45,11 +47,11 @@ export function buildAlertsLivePanel(page = 0) {
         const grp = w.groupActive ? '' : ' _(pause)_';
         return `${st} · **${w.label}** · ${w.groupEmoji} ${w.groupName}${grp}`;
       })
-    : ['_Aucun wallet — menu 💼 Wallets pour en ajouter._'];
+    : [`_Aucun wallet — ${ICO.wallets} Wallets pour en ajouter._`];
 
   const embed = new EmbedBuilder()
     .setColor(UI_COLORS.alerts)
-    .setTitle('🔔 Alertes live')
+    .setTitle(L(ICO.alerts, 'Alertes live'))
     .setDescription(
       [
         `**${sum.on}** actif(s) sur **${all.length}** wallet(s) · page **${p + 1}/${totalPages}**`,
@@ -65,7 +67,7 @@ export function buildAlertsLivePanel(page = 0) {
   const toggleBtns = slice.map(w =>
     uiBtn(
       alertToggleId(w.addr),
-      `${w.alertsOn ? '🟢' : '⚫'} ${w.label}`.slice(0, 80),
+      `${w.alertsOn ? ICO.on : ICO.off} ${w.label}`.slice(0, 80),
       w.alertsOn ? ButtonStyle.Success : ButtonStyle.Secondary,
     ),
   );
@@ -74,17 +76,17 @@ export function buildAlertsLivePanel(page = 0) {
   if (totalPages > 1) {
     navRows.push(
       uiRow(
-        uiBtn(ACID.PREV, '⬅️ Page', ButtonStyle.Secondary),
-        uiBtn(ACID.NEXT, '➡️ Page', ButtonStyle.Secondary),
+        uiBtn(ACID.PREV, L(ICO.pageL, 'Page'), ButtonStyle.Secondary),
+        uiBtn(ACID.NEXT, L(ICO.pageR, 'Page'), ButtonStyle.Secondary),
       ),
     );
   }
   navRows.push(
     uiRow(
-      uiBtn(ACID.ALL_ON, '✅ Tout ON', ButtonStyle.Success),
-      uiBtn(ACID.ALL_OFF, '⛔ Tout OFF', ButtonStyle.Danger),
+      uiBtn(ACID.ALL_ON, L(ICO.allOn, 'Tout ON'), ButtonStyle.Success),
+      uiBtn(ACID.ALL_OFF, L(ICO.allOff, 'Tout OFF'), ButtonStyle.Danger),
     ),
-    uiRow(btnBack(ACID.BACK_SETTINGS, '⚙️ Paramètres'), btnHome()),
+    uiRow(btnBack(ACID.BACK_SETTINGS, 'Paramètres'), btnHome()),
   );
 
   const components = uiClampRows([...uiRowsPair(toggleBtns, 2), ...navRows]);
