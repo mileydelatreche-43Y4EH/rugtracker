@@ -28,7 +28,8 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
   const railwayPollOnly =
     process.env.RAILWAY_POLL_ONLY === '1' ||
     (isRailway && singleKey && process.env.RAILWAY_WS_MODE === '0');
-  const useTxSubscribe = process.env.HELIUS_TX_SUBSCRIBE !== '0';
+  /** `transactionSubscribe` = Helius payant uniquement. Par défaut `logsSubscribe` (plan gratuit). */
+  const useTxSubscribe = process.env.HELIUS_TX_SUBSCRIBE === '1';
   const wsCommitment =
     process.env.WORKER_WS_COMMITMENT === 'confirmed' ? 'confirmed' : 'processed';
   const warmSigAgeSec = Number(process.env.WARM_SIG_AGE_SEC || 300);
@@ -266,13 +267,16 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
           const d = JSON.parse(ev.data);
           if (d.error) {
             const errMsg = d.error.message || JSON.stringify(d.error);
-            console.warn(`WS clé #${keyIndex + 1} erreur:`, errMsg);
             if (box.mode === 'tx' && d.id === 1) {
-              console.warn('→ repli logsSubscribe (transactionSubscribe indisponible ?)');
+              console.log(
+                `WS clé #${keyIndex + 1} · ${errMsg} → bascule logsSubscribe (plan gratuit Helius)`,
+              );
               box.mode = 'logs';
               try {
                 ws.close();
               } catch {}
+            } else {
+              console.warn(`WS clé #${keyIndex + 1} erreur:`, errMsg);
             }
             return;
           }
@@ -392,6 +396,11 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
 
   async function start() {
     rebuildWalletMaps();
+    console.log(
+      useTxSubscribe
+        ? '🔌 WS Helius · transactionSubscribe (plan payant)'
+        : '🔌 WS Helius · logsSubscribe (plan gratuit)',
+    );
     if (!wallets.length) {
       console.warn('⚠ Aucun wallet actif — ajoute-en via Discord /wallet add');
     }

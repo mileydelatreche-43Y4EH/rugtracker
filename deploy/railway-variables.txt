@@ -20,8 +20,9 @@ CLOUD_SYNC_SECRET=bundle_tracker_sync
 # NE PAS METTRE (efface les wallets au redeploy) :
 # WALLET_STORE_PATH=/data/wallets.json
 
-# ── Alertes rapides ──
-HELIUS_TX_SUBSCRIBE=1
+# ── WebSocket Helius ──
+# HELIUS_TX_SUBSCRIBE=1   ← plan PAYANT seulement (sinon erreur + repli auto)
+# Par défaut : logsSubscribe (plan gratuit) — ne pas mettre cette variable
 RAILWAY_POLL_ONLY=0
 WORKER_WS_COMMITMENT=processed
 ENABLE_POLL_FALLBACK=0
