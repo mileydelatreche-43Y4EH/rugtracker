@@ -8,6 +8,7 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js';
+import { isCloudPersistEnabled } from '../api/lib/cloud-persist.mjs';
 import { loadStore, storeSummary } from '../api/lib/wallet-store.mjs';
 import { buildAlertsLivePanel } from './discord-alerts-panel.mjs';
 import {
@@ -48,29 +49,35 @@ export const CID = {
   MODAL_GR_ADD: 'bt:modal:gradd',
 };
 
-function formatHomeSummary() {
+export function buildHomePanel(ctx = {}) {
   const sum = storeSummary();
-  if (!sum.wallets.length) {
-    return '_Aucun wallet — ouvre **👛 Wallets** pour en ajouter._';
-  }
-  const lines = sum.wallets.slice(0, 12).map(w => `${w.groupEmoji} **${w.label}** · _${w.groupName}_`);
-  const more = sum.wallets.length > 12 ? `\n_… et ${sum.wallets.length - 12} autre(s)_` : '';
-  return lines.join('\n') + more;
-}
-
-export function buildHomePanel() {
-  const embed = uiEmbed(UI_COLORS.home, '◈ Bundle Tracker', formatHomeSummary(), {
-    timestamp: false,
-  });
+  const heliusCount = ctx.heliusCount ?? 0;
+  const channelId = String(ctx.channelId || '').trim();
+  const embed = uiEmbed(
+    UI_COLORS.home,
+    L(ICO.status, 'Statut du bot'),
+    'État en temps réel du worker et de la configuration.',
+    {
+      fields: [
+        { name: '🤖 Bot', value: `${ICO.on} En ligne`, inline: true },
+        { name: L(ICO.wallets, 'Actifs'), value: String(sum.activeCount), inline: true },
+        { name: '⚡ Helius', value: `${heliusCount} clé(s)`, inline: true },
+        { name: '💬 Salon', value: channelId ? `<#${channelId}>` : '—', inline: false },
+        {
+          name: L(ICO.groups, 'Groupes'),
+          value: sum.lines.join('\n').slice(0, 1024) || '—',
+          inline: false,
+        },
+      ],
+    },
+  );
 
   return {
     embeds: [embed],
     components: uiClampRows(
       uiRowsPair([
         uiBtn(CID.WALLETS, L(ICO.wallets, 'Wallets'), ButtonStyle.Primary),
-        uiBtn(CID.GROUPS, L(ICO.groups, 'Groupes'), ButtonStyle.Primary),
         uiBtn(CID.SETTINGS, L(ICO.settings, 'Paramètres'), ButtonStyle.Secondary),
-        uiBtn(CID.STATUS, L(ICO.status, 'Statut'), ButtonStyle.Secondary),
       ]),
     ),
   };
@@ -78,14 +85,16 @@ export function buildHomePanel() {
 
 export function buildWalletsMenu() {
   const sum = storeSummary();
+  const store = loadStore();
   const embed = uiEmbed(
     UI_COLORS.wallets,
-    L(ICO.wallets, 'Wallets surveillés'),
+    L(ICO.wallets, 'Wallets & groupes'),
     [
-      `**${sum.activeCount}** adresse(s) active(s) pour les alertes.`,
+      `**${sum.activeCount}** wallet(s) actif(s) · **${store.groups.length}** groupe(s)`,
       '',
-      '**Gestion** — liste, ajout, retrait',
-      '**Backup** — import/export `.json` (wallets + groupes)',
+      '**Wallets** — liste, ajout, retrait',
+      '**Groupes** — liste, créer, pause / reprise',
+      '**Backup** — import / export `.json`',
     ].join('\n'),
     { footer: 'Groupe en pause = pas d’alerte pour ses wallets' },
   );
@@ -94,9 +103,13 @@ export function buildWalletsMenu() {
     embeds: [embed],
     components: uiClampRows([
       ...uiRowsPair([
-        uiBtn(CID.WL_LIST, L(ICO.list, 'Liste'), ButtonStyle.Secondary),
-        uiBtn(CID.WL_ADD, L(ICO.add, 'Ajouter'), ButtonStyle.Success),
+        uiBtn(CID.WL_LIST, L(ICO.list, 'Liste wallets'), ButtonStyle.Secondary),
+        uiBtn(CID.WL_ADD, L(ICO.add, 'Ajouter wallet'), ButtonStyle.Success),
         uiBtn(CID.WL_RM, L(ICO.remove, 'Retirer'), ButtonStyle.Danger),
+        uiBtn(CID.GR_LIST, L(ICO.list, 'Liste groupes'), ButtonStyle.Secondary),
+        uiBtn(CID.GR_ADD, L(ICO.create, 'Créer groupe'), ButtonStyle.Success),
+        uiBtn(CID.GR_PAUSE, L(ICO.pause, 'Pause'), ButtonStyle.Secondary),
+        uiBtn(CID.GR_RESUME, L(ICO.resume, 'Reprendre'), ButtonStyle.Secondary),
         uiBtn(CID.IMPORT, L(ICO.import, 'Import .json'), ButtonStyle.Secondary),
         uiBtn(CID.EXPORT, L(ICO.export, 'Export .json'), ButtonStyle.Secondary),
       ]),
@@ -162,35 +175,6 @@ export function buildWalletRemoveSelect() {
   return { embeds: [embed], components: uiClampRows(components) };
 }
 
-export function buildGroupsMenu() {
-  const store = loadStore();
-  const embed = uiEmbed(
-    UI_COLORS.groups,
-    L(ICO.groups, 'Groupes'),
-    [
-      `**${store.groups.length}** groupe(s) · classe tes wallets par stratégie.`,
-      '',
-      '**Gestion** — créer, lister, pause/reprise',
-      '**Backup** — même fichier `.json` que dans Wallets',
-    ].join('\n'),
-  );
-
-  return {
-    embeds: [embed],
-    components: uiClampRows([
-      ...uiRowsPair([
-        uiBtn(CID.GR_LIST, L(ICO.list, 'Liste'), ButtonStyle.Secondary),
-        uiBtn(CID.GR_ADD, L(ICO.create, 'Créer'), ButtonStyle.Success),
-        uiBtn(CID.GR_PAUSE, L(ICO.pause, 'Pause'), ButtonStyle.Secondary),
-        uiBtn(CID.GR_RESUME, L(ICO.resume, 'Reprendre'), ButtonStyle.Secondary),
-        uiBtn(CID.IMPORT, L(ICO.import, 'Import .json'), ButtonStyle.Secondary),
-        uiBtn(CID.EXPORT, L(ICO.export, 'Export .json'), ButtonStyle.Secondary),
-      ]),
-      uiRow(btnHome()),
-    ]),
-  };
-}
-
 export function buildGroupsList() {
   const sum = storeSummary();
   const embed = uiEmbed(
@@ -201,7 +185,7 @@ export function buildGroupsList() {
 
   return {
     embeds: [embed],
-    components: [navBackHome(CID.GROUPS, 'Groupes')],
+    components: [navBackHome(CID.WALLETS, 'Wallets')],
   };
 }
 
@@ -227,7 +211,7 @@ export function buildGroupSelect(customId, mode) {
         : '_Aucun groupe en pause._',
   );
 
-  const components = [navBackHome(CID.GROUPS, 'Groupes')];
+  const components = [navBackHome(CID.WALLETS, 'Wallets')];
   if (options.length) {
     components.unshift(
       new ActionRowBuilder().addComponents(
@@ -244,46 +228,18 @@ export function buildGroupSelect(customId, mode) {
   return { embeds: [embed], components: uiClampRows(components) };
 }
 
-export function buildStatusPanel(heliusCount, channelId) {
-  const sum = storeSummary();
-  const embed = uiEmbed(
-    UI_COLORS.home,
-    L(ICO.status, 'Statut du bot'),
-    'État en temps réel du worker et de la configuration.',
-    {
-      fields: [
-        { name: '🤖 Bot', value: `${ICO.on} En ligne`, inline: true },
-        { name: L(ICO.wallets, 'Actifs'), value: String(sum.activeCount), inline: true },
-        { name: '⚡ Helius', value: `${heliusCount} clé(s)`, inline: true },
-        { name: '💬 Salon', value: `<#${channelId}>`, inline: false },
-        { name: L(ICO.groups, 'Groupes'), value: sum.lines.slice(0, 6).join('\n') || '—', inline: false },
-      ],
-    },
-  );
-
-  return {
-    embeds: [embed],
-    components: uiClampRows([
-      uiRow(uiBtn(CID.REFRESH, L(ICO.resync, 'Resync worker'), ButtonStyle.Secondary)),
-      uiRow(btnHome()),
-    ]),
-  };
-}
-
 export function buildSettingsPanel(heliusCount) {
-  const metaMs = process.env.NTFY_META_TIMEOUT_MS || '850';
-  const ntfy = (process.env.NTFY_TOPIC || '').trim() ? `${ICO.on} OK` : `${ICO.off} Non configuré`;
+  const ntfyOn = !!(process.env.NTFY_TOPIC || '').trim();
+  const cloudOn = isCloudPersistEnabled();
   const embed = uiEmbed(
     UI_COLORS.settings,
     L(ICO.settings, 'Paramètres'),
     [
-      'Outils du bot — backup dans **Wallets** / **Groupes**.',
-      '',
-      `📱 **ntfy** (clic → Axiom) · ${ntfy}`,
-      `⚡ **Meta alertes** · ~${metaMs} ms`,
-      `🔑 **Helius** · ${heliusCount} clé(s)`,
+      `${ntfyOn ? ICO.on : ICO.off} **Notifs téléphone** (ntfy)`,
+      `${heliusCount > 0 ? ICO.on : ICO.off} **Helius** — ${heliusCount} clé(s)`,
+      `${cloudOn ? ICO.on : ICO.off} **Sauvegarde cloud** (Redis)`,
     ].join('\n'),
-    { footer: 'Notif Windows : clic = Discord · lien Axiom dans le message' },
+    { timestamp: false },
   );
 
   return {
@@ -292,7 +248,6 @@ export function buildSettingsPanel(heliusCount) {
       uiRowsPair([
         uiBtn(CID.TEST, L(ICO.test, 'Test alerte'), ButtonStyle.Secondary),
         uiBtn(CID.REFRESH, L(ICO.resync, 'Resync'), ButtonStyle.Secondary),
-        uiBtn(CID.STATUS, L(ICO.status, 'Statut'), ButtonStyle.Secondary),
       ]).concat([uiRow(btnHome())]),
     ),
   };
@@ -370,7 +325,7 @@ export function resolveScreen(customId) {
     case CID.WL_RM:
       return 'wl_rm';
     case CID.GROUPS:
-      return 'groups';
+      return 'wallets';
     case CID.GR_LIST:
       return 'gr_list';
     case CID.GR_PAUSE:
@@ -378,7 +333,7 @@ export function resolveScreen(customId) {
     case CID.GR_RESUME:
       return 'gr_resume';
     case CID.STATUS:
-      return 'status';
+      return 'home';
     case CID.SETTINGS:
       return 'settings';
     case CID.ALERTS_LIVE:
@@ -391,7 +346,7 @@ export function resolveScreen(customId) {
 export async function renderScreen(screen, ctx) {
   switch (screen) {
     case 'home':
-      return buildHomePanel();
+      return buildHomePanel(ctx);
     case 'wallets':
       return buildWalletsMenu();
     case 'wl_list':
@@ -399,20 +354,18 @@ export async function renderScreen(screen, ctx) {
     case 'wl_rm':
       return buildWalletRemoveSelect();
     case 'groups':
-      return buildGroupsMenu();
+      return buildWalletsMenu();
     case 'gr_list':
       return buildGroupsList();
     case 'gr_pause':
       return buildGroupSelect(CID.SEL_PAUSE, 'pause');
     case 'gr_resume':
       return buildGroupSelect(CID.SEL_RESUME, 'resume');
-    case 'status':
-      return buildStatusPanel(ctx.heliusCount, ctx.channelId);
     case 'settings':
       return buildSettingsPanel(ctx.heliusCount);
     case 'alerts_live':
       return buildAlertsLivePanel(0);
     default:
-      return buildHomePanel();
+      return buildHomePanel(ctx);
   }
 }
