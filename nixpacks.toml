@@ -1,9 +1,9 @@
-# Railway — bot Discord 24/7 (pas de pre-deploy)
+# Railway / Nixpacks — bot Discord
 [phases.setup]
 nixPkgs = ["nodejs_22"]
 
 [phases.install]
-cmds = ["npm install --omit=dev --no-audit --no-fund"]
+cmds = ["npm ci --omit=dev --no-audit --no-fund"]
 
 [start]
 cmd = "node bot/discord-bot.mjs"
