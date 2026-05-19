@@ -4,7 +4,6 @@ import {
   ButtonStyle,
   EmbedBuilder,
 } from 'discord.js';
-import { resolveTokenImageUrl } from './token-meta.mjs';
 import { buildBuyAlertText, fmtTokenSym, fmtWalletGroup, fmtMcShort } from './alert-format.mjs';
 import { pairButtonRows } from './discord-button-rows.mjs';
 import { rememberAlertContext } from './alert-context.mjs';
@@ -68,8 +67,8 @@ export function buildBuyEmbed({ w, hit, meta, sig }) {
     .setFooter({ text: sig ? `tx ${sig.slice(0, 16)}…` : 'Bundle Tracker' })
     .setTimestamp();
 
-  const img = resolveTokenImageUrl(mint, meta);
-  if (img) embed.setThumbnail(img);
+  const img = String(meta?.imageUrl || '').trim();
+  if (img.startsWith('http')) embed.setThumbnail(img);
 
   return embed;
 }

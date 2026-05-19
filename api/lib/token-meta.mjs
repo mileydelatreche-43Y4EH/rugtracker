@@ -36,7 +36,7 @@ export async function resolveTokenImageQuick(mint, meta = {}, timeoutMs = 450) {
       setTimeout(() => resolve(''), timeoutMs);
     }),
   ]);
-  return got || resolveTokenImageUrl(m, meta);
+  return got || '';
 }
 
 export function minimalTokenMeta(mint) {
@@ -44,7 +44,7 @@ export function minimalTokenMeta(mint) {
   return {
     sym: m.slice(0, 8).toUpperCase(),
     name: '',
-    imageUrl: resolveTokenImageUrl(m, {}),
+    imageUrl: '',
     mcUsd: 0,
     pairAddress: '',
     snap: { risk: '…' },
