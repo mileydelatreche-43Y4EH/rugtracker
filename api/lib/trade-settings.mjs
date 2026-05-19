@@ -3,6 +3,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { formatBuyPresets, formatPriorityFeeAxiom, formatSolLabel } from './trade-format.mjs';
 import { resolvePersistPath } from './data-paths.mjs';
+import { scheduleCloudPersist } from './cloud-persist.mjs';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(__dir, '../../data/trade-settings.json');
@@ -71,6 +72,7 @@ export function saveTradeSettings(data) {
       console.warn('trade-settings listener', e.message);
     }
   }
+  scheduleCloudPersist();
   return normalized;
 }
 

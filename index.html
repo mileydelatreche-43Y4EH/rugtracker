@@ -655,6 +655,21 @@ function scheduleCloudBackup() {
   if (cloudBackupTimer) clearTimeout(cloudBackupTimer);
   cloudBackupTimer = setTimeout(() => { void pushCloudBackup(false); }, 1200);
 }
+async function fetchCloudApi(url, opts) {
+  const r = await fetch(url, opts);
+  const text = await r.text();
+  if (!text.trim()) {
+    throw new Error('Réponse vide — ajoute REDIS_URL dans .env (ou KV_REST sur Vercel)');
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    if (text.trimStart().startsWith('/') || text.includes('/**')) {
+      throw new Error('API cloud KO — lance npm run dev ou déploie sur Vercel avec KV');
+    }
+    throw new Error('Réponse invalide : ' + text.slice(0, 80));
+  }
+}
 async function pushCloudBackup(manual) {
   const hash = localStorage.getItem(LS_SYNC_HASH);
   if (!hash) {
@@ -664,12 +679,11 @@ async function pushCloudBackup(manual) {
   const payload = buildSiteBackupPayload();
   try {
     setCloudSyncStatus('Envoi cloud…', null);
-    const r = await fetch('/api/cloud-sync?key=' + encodeURIComponent(hash), {
+    const j = await fetchCloudApi('/api/cloud-sync?key=' + encodeURIComponent(hash), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const j = await r.json();
     if (!j.ok) {
       setCloudSyncStatus(j.error || 'Échec cloud (Vercel KV ?)', false);
       return;
@@ -695,8 +709,7 @@ async function pullCloudBackupNow() {
   }
   try {
     setCloudSyncStatus('Téléchargement…', null);
-    const r = await fetch('/api/cloud-sync?key=' + encodeURIComponent(key));
-    const j = await r.json();
+    const j = await fetchCloudApi('/api/cloud-sync?key=' + encodeURIComponent(key));
     if (!j.ok) {
       setCloudSyncStatus(j.error || 'Cloud indisponible', false);
       return;
@@ -730,8 +743,7 @@ async function pullCloudOnBoot() {
   const hash = localStorage.getItem(LS_SYNC_HASH);
   if (!hash) return;
   try {
-    const r = await fetch('/api/cloud-sync?key=' + encodeURIComponent(hash));
-    const j = await r.json();
+    const j = await fetchCloudApi('/api/cloud-sync?key=' + encodeURIComponent(hash));
     if (!j.ok || !j.data?.groups?.length) return;
     const localAt = localStorage.getItem(LS_BACKUP_AT) || '';
     const cloudAt = j.data.exportedAt || '';

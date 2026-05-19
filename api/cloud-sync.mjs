@@ -1,25 +1,40 @@
 /**
- * Sauvegarde cloud (Vercel KV) — groupes + réglages
- * Variables Vercel : KV_REST_API_URL, KV_REST_API_TOKEN (Storage → KV)
+ * Sauvegarde cloud (site) — REDIS_URL ou REST Upstash/KV
  */
+import { ensureKvEnv } from './lib/kv-env.mjs';
+import { cloudGet, cloudSet, isCloudStorageReady } from './lib/redis-cloud.mjs';
+
 export async function GET(request) {
+  ensureKvEnv();
+  if (!isCloudStorageReady()) {
+    return Response.json(
+      { ok: false, error: 'Redis non configuré — ajoute REDIS_URL ou KV_REST_API_*' },
+      { status: 503 },
+    );
+  }
   const key = new URL(request.url).searchParams.get('key');
   if (!key || key.length < 32 || key.length > 128) {
     return Response.json({ ok: false, error: 'Clé sync invalide' }, { status: 400 });
   }
   try {
-    const { kv } = await import('@vercel/kv');
-    const data = await kv.get(`bt:${key}`);
+    const data = await cloudGet(`bt:${key}`);
     return Response.json({ ok: true, data: data || null });
   } catch (e) {
     return Response.json(
-      { ok: false, error: 'Cloud indisponible — active Vercel KV (Storage)', detail: e.message },
+      { ok: false, error: 'Cloud indisponible', detail: e.message },
       { status: 503 },
     );
   }
 }
 
 export async function POST(request) {
+  ensureKvEnv();
+  if (!isCloudStorageReady()) {
+    return Response.json(
+      { ok: false, error: 'Redis non configuré — ajoute REDIS_URL ou KV_REST_API_*' },
+      { status: 503 },
+    );
+  }
   const key = new URL(request.url).searchParams.get('key');
   if (!key || key.length < 32 || key.length > 128) {
     return Response.json({ ok: false, error: 'Clé sync invalide' }, { status: 400 });
@@ -34,12 +49,11 @@ export async function POST(request) {
     return Response.json({ ok: false, error: 'Backup invalide' }, { status: 400 });
   }
   try {
-    const { kv } = await import('@vercel/kv');
-    await kv.set(`bt:${key}`, body);
+    await cloudSet(`bt:${key}`, body);
     return Response.json({ ok: true, savedAt: body.exportedAt });
   } catch (e) {
     return Response.json(
-      { ok: false, error: 'Cloud indisponible — active Vercel KV (Storage)', detail: e.message },
+      { ok: false, error: 'Cloud indisponible', detail: e.message },
       { status: 503 },
     );
   }

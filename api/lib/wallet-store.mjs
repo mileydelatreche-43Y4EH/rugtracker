@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { resolvePersistPath } from './data-paths.mjs';
+import { scheduleCloudPersist } from './cloud-persist.mjs';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const defaultPath = resolve(__dir, '../../data/wallets.json');
@@ -132,6 +133,7 @@ export function saveStore(data) {
       console.warn('wallet-store listener', e.message);
     }
   }
+  scheduleCloudPersist();
   return normalized;
 }
 

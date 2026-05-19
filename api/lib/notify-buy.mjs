@@ -69,7 +69,7 @@ export async function notifyBuyAlert(ctx, w, hit, sig, rpcCall, walletIndex = 0,
 
   let discordMsg = null;
   if (ctx.discordChannel) {
-    const dup = shouldSkipDuplicateChannelAlert(mint);
+    const dup = shouldSkipDuplicateChannelAlert(mint, w.addr);
     if (!dup) {
       discordMsg = await sendDiscordBuyAlert(ctx.discordChannel, {
         w,

@@ -1,4 +1,5 @@
 import { importBackup, loadStore, storeSummary } from '../api/lib/wallet-store.mjs';
+import { replyEphemeralBrief } from './discord-ui.mjs';
 
 async function downloadJsonAttachment(att) {
   const res = await fetch(att.url);
@@ -35,16 +36,16 @@ export async function importJsonAttachment(att) {
 
 /** Bouton Importer : guide vers /import (fichier depuis le PC). */
 export async function startJsonFileImport(interaction) {
-  await interaction.reply({
-    content: [
+  await replyEphemeralBrief(
+    interaction,
+    [
       '📥 **Importer backup**',
       '',
       'Tape **`/import`** → **fichier** → choisis ton `.json` sur ton PC.',
       '',
       '_Export site ou **Exporter .json** du bot — pas de copier-coller._',
     ].join('\n'),
-    ephemeral: true,
-  });
+  );
 }
 
 /**

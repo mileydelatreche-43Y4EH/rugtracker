@@ -119,9 +119,23 @@ export function extractQuickBuyFromLogs(logs) {
 /** Forme getTransaction depuis une notif Helius transactionSubscribe. */
 export function normalizeHeliusWsTransaction(result) {
   if (!result) return null;
-  const inner = result.transaction;
-  if (inner?.meta && (inner.transaction || inner.message)) return inner;
-  if (result.meta && result.transaction) return result;
+  const wrap = result.transaction;
+  if (!wrap) return null;
+
+  if (wrap.meta) {
+    let inner = wrap.transaction;
+    if (Array.isArray(inner)) return null;
+    if (inner?.message || inner?.signatures) {
+      return { transaction: inner, meta: wrap.meta };
+    }
+    if (wrap.message) return { transaction: wrap, meta: wrap.meta };
+  }
+
+  if (result.meta && result.transaction && typeof result.transaction === 'object') {
+    const inner = result.transaction;
+    if (inner.message) return { transaction: inner, meta: result.meta };
+  }
+
   return null;
 }
 

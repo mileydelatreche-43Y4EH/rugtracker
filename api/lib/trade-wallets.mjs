@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import bs58 from 'bs58';
 import { Keypair } from '@solana/web3.js';
 import { resolvePersistPath } from './data-paths.mjs';
+import { scheduleCloudPersist } from './cloud-persist.mjs';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(__dir, '../../data/trade-wallets.json');
@@ -52,6 +53,7 @@ function saveFileStore(data) {
   const p = walletsPath();
   mkdirSync(dirname(p), { recursive: true });
   writeFileSync(p, JSON.stringify(data, null, 2), 'utf8');
+  scheduleCloudPersist();
 }
 
 /** Liste publique (sans secrets). */

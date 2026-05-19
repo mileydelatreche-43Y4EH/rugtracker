@@ -24,7 +24,12 @@ import {
   findGroup,
 } from '../api/lib/wallet-store.mjs';
 import { createBundleWorker } from '../worker/bundle-worker.mjs';
-import { ensureRailwayDataDir, resolvePersistPath } from '../api/lib/data-paths.mjs';
+import { ensureRailwayDataDir } from '../api/lib/data-paths.mjs';
+import {
+  hydrateFromCloud,
+  flushCloudPersist,
+  logWalletStoreStatus,
+} from '../api/lib/cloud-persist.mjs';
 import {
   CID,
   renderScreen,
@@ -55,7 +60,10 @@ import {
 import {
   dismissEphemeral,
   showEphemeralError,
+  showEphemeralFollowUp,
   replyEphemeralBrief,
+  editEphemeralBrief,
+  scheduleEphemeralDismiss,
   safePanelUpdate,
   isUnknownInteraction,
 } from './discord-ui.mjs';
@@ -121,8 +129,10 @@ if (!TOKEN || !CLIENT_ID || !CHANNEL_ID) {
 if (!HELIUS_KEYS.length) process.exit(1);
 
 ensureRailwayDataDir();
+await hydrateFromCloud();
 loadStore();
 loadTradeSettings();
+await logWalletStoreStatus();
 
 const uiCtx = () => ({ heliusCount: HELIUS_KEYS.length, channelId: CHANNEL_ID });
 
@@ -208,10 +218,7 @@ async function sendTestAlert() {
 
 async function deny(interaction) {
   if (interaction.replied || interaction.deferred) return;
-  await interaction.reply({
-    content: '⛔ Seuls les admins du bot peuvent utiliser ce panneau.',
-    ephemeral: true,
-  });
+  await replyEphemeralBrief(interaction, '⛔ Seuls les admins du bot peuvent utiliser ce panneau.');
 }
 
 async function handleButton(interaction) {
@@ -260,6 +267,7 @@ async function handleButton(interaction) {
       files: [exportAttachment()],
       ephemeral: true,
     });
+    scheduleEphemeralDismiss(interaction);
     return;
   }
 
@@ -379,12 +387,7 @@ async function handleInteraction(interaction) {
     try {
       await handleTradeAlertButton(interaction);
     } catch (e) {
-      const msg = e.message || String(e);
-      if (interaction.deferred) {
-        await interaction.editReply({ content: `❌ ${msg}` }).catch(() => {});
-      } else {
-        await interaction.reply({ content: `❌ ${msg}`, ephemeral: true }).catch(() => {});
-      }
+      await showEphemeralError(interaction, e.message || String(e));
     }
     return;
   }
@@ -409,12 +412,17 @@ async function handleInteraction(interaction) {
         const r = await importJsonAttachment(att);
         if (workerHandle) void workerHandle.resync();
         void updatePanel('home');
-        await interaction.editReply(
+        const cloudOk = await flushCloudPersist();
+        await editEphemeralBrief(
+          interaction,
           `✅ **Import OK** · \`${r.fileName}\`\n` +
-            `**${r.wallets}** wallet(s) · **${r.groups}** groupe(s) · **${r.active}** actif(s) pour les alertes.`,
+            `**${r.wallets}** wallet(s) · **${r.groups}** groupe(s) · **${r.active}** actif(s) pour les alertes.\n` +
+            (cloudOk
+              ? '☁ **Sauvegardé dans Redis** — survive au redeploy.'
+              : '⚠ **Redis non sauvegardé** — ajoute `REDIS_URL` + `CLOUD_SYNC_SECRET` sur Railway.'),
         );
       } catch (e) {
-        await interaction.editReply(`❌ Import : ${e.message || e}`);
+        await editEphemeralBrief(interaction, `❌ Import : ${e.message || e}`);
       }
       return;
     }
@@ -441,15 +449,9 @@ async function handleInteraction(interaction) {
     if (isUnknownInteraction(e)) return;
     const msg = e.message || String(e);
     if (interaction.isModalSubmit()) {
-      if (interaction.deferred) {
-        await interaction.editReply({ content: `❌ ${msg}` }).catch(() => {});
-      } else if (!interaction.replied) {
-        await interaction.reply({ content: `❌ ${msg}`, ephemeral: true }).catch(() => {});
-      }
+      await showEphemeralError(interaction, msg);
     } else if (interaction.isButton() || interaction.isStringSelectMenu()) {
-      await interaction
-        .followUp({ content: `❌ ${msg}`, ephemeral: true })
-        .catch(() => interaction.reply({ content: `❌ ${msg}`, ephemeral: true }).catch(() => {}));
+      await showEphemeralFollowUp(interaction, msg);
     }
   }
 }
@@ -482,7 +484,7 @@ async function setupPanel() {
 
 client.once('ready', async () => {
   console.log(`🤖 Discord connecté : ${client.user.tag}`);
-  console.log(`📂 Fichier wallets : ${resolvePersistPath('wallets.json', 'WALLET_STORE_PATH', 'data/wallets.json')}`);
+  await logWalletStoreStatus();
 
   await registerSlashCommands();
 
@@ -516,5 +518,6 @@ client.on('interactionCreate', interaction => {
 
 console.log(`Bundle Tracker · ${HELIUS_KEYS.length} clé(s) Helius · salon ${CHANNEL_ID}`);
 console.log('🔌 Intents Discord : Guilds uniquement (import via /import)');
+console.log('📦 Build cloud-redis — cherche ☁ REDIS_URL dans les logs ci-dessous');
 
 await client.login(TOKEN);

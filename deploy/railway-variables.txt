@@ -1,0 +1,38 @@
+# ═══════════════════════════════════════════════════════════════
+# Variables Railway — service BOT (rugtracker / bundle-tracker)
+# Colle chaque ligne dans Railway → ton service → Variables
+# ═══════════════════════════════════════════════════════════════
+
+# ── Discord (déjà en place chez toi) ──
+DISCORD_BOT_TOKEN=
+DISCORD_CLIENT_ID=
+DISCORD_GUILD_ID=
+DISCORD_CHANNEL_ID=
+DISCORD_ADMIN_IDS=
+
+# ── Helius ──
+HELIUS_API_KEYS=cle1,cle2,cle3
+
+# ── Redis Upstash (OBLIGATOIRE sans volume Railway) ──
+REDIS_URL=rediss://default:TON_MOT_DE_PASSE@skilled-kodiak-130431.upstash.io:6379
+CLOUD_SYNC_SECRET=bundle_tracker_sync
+
+# NE PAS METTRE (efface les wallets au redeploy) :
+# WALLET_STORE_PATH=/data/wallets.json
+
+# ── Alertes rapides ──
+HELIUS_TX_SUBSCRIBE=1
+RAILWAY_POLL_ONLY=0
+WORKER_WS_COMMITMENT=processed
+ENABLE_POLL_FALLBACK=0
+
+# ── Optionnel panneau ──
+# PANEL_MESSAGE_ID=
+
+# ═══════════════════════════════════════════════════════════════
+# Site Vercel (si déployé) — mêmes Redis + code secret cloud
+# ═══════════════════════════════════════════════════════════════
+# REDIS_URL=rediss://default:...@skilled-kodiak-130431.upstash.io:6379
+# (Sur Vercel, tu peux aussi utiliser les vars auto si tu lies Upstash)
+
+# Site : Paramètres → code secret = bundle_tracker_sync → Activer le cloud
