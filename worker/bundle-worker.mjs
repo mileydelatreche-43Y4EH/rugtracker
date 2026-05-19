@@ -10,6 +10,7 @@ import {
   PUMP,
   PUMP_SWAP,
 } from '../api/lib/solana.mjs';
+import WebSocket from 'ws';
 import { shouldSkipDuplicateGroupBuy } from '../api/lib/alert-dedupe.mjs';
 import { getActiveWallets, onStoreChange } from '../api/lib/wallet-store.mjs';
 
@@ -165,6 +166,7 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
     for (const box of wsBoxes) {
       box.stopped = true;
       if (box.reconnectTimer) clearTimeout(box.reconnectTimer);
+      if (box.pingTimer) clearInterval(box.pingTimer);
       try {
         box.ws?.close();
       } catch {}
@@ -202,6 +204,7 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
       stopped: false,
       ws: null,
       reconnectTimer: null,
+      pingTimer: null,
       backoffMs: 3000,
       mode: useTxSubscribe ? 'tx' : 'logs',
       logSubByRpcId: new Map(),
@@ -248,17 +251,21 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
       const ws = new WebSocket(wsUrl);
       box.ws = ws;
 
-      ws.onopen = () => {
+      ws.on('open', () => {
         box.backoffMs = 3000;
         box.logSubByRpcId.clear();
         subscribe(ws);
+        if (box.pingTimer) clearInterval(box.pingTimer);
+        box.pingTimer = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) ws.ping();
+        }, 25000);
         const mode = box.mode === 'tx' ? 'txSubscribe' : 'logsSubscribe';
         console.log(`✅ WS clé #${keyIndex + 1} · ${mode} · ${keyWallets.length} wallet(s)`);
-      };
+      });
 
-      ws.onmessage = ev => {
+      ws.on('message', raw => {
         try {
-          const d = JSON.parse(ev.data);
+          const d = JSON.parse(typeof raw === 'string' ? raw : raw.toString());
           if (d.error) {
             const errMsg = d.error.message || JSON.stringify(d.error);
             if (box.mode === 'tx' && d.id === 1) {
@@ -302,10 +309,14 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
         } catch (e) {
           console.warn('WS message', e.message || e);
         }
-      };
+      });
 
-      ws.onclose = () => {
+      ws.on('close', () => {
         box.ws = null;
+        if (box.pingTimer) {
+          clearInterval(box.pingTimer);
+          box.pingTimer = null;
+        }
         if (box.stopped) return;
         if (box.reconnectTimer) return;
         const wait = box.backoffMs;
@@ -314,11 +325,11 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
           box.backoffMs = Math.min(box.backoffMs * 1.5, 45000);
           connect();
         }, wait);
-      };
+      });
 
-      ws.onerror = () => {
+      ws.on('error', () => {
         console.warn(`WS clé #${keyIndex + 1} erreur réseau`);
-      };
+      });
     }
 
     connect();
