@@ -32,7 +32,7 @@ export async function notifyBuyFast(topic, w, hit, rpcCall, walletIndex = 0) {
   ]);
 
   const click = await clickP;
-  const { title, body } = buildPhoneNtfyPayload(w, meta, mint);
+  const { title, body } = buildPhoneNtfyPayload(w, meta, mint, click);
 
   const attach = resolveTokenImageUrl(mint, meta);
   await postNtfy(topic, body, {

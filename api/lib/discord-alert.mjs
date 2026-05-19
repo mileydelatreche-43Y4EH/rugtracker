@@ -4,7 +4,7 @@ import {
   ButtonStyle,
   EmbedBuilder,
 } from 'discord.js';
-import { fmtU, resolveTokenImageUrl } from './token-meta.mjs';
+import { resolveTokenImageUrl } from './token-meta.mjs';
 import { buildBuyAlertText, fmtTokenSym, fmtWalletGroup, fmtMcShort } from './alert-format.mjs';
 import { buildTradeButtonRows } from './discord-trade.mjs';
 import { pairButtonRows } from './discord-button-rows.mjs';
@@ -48,25 +48,20 @@ export function buildBuyAlertContent({ w, hit, meta, axiomUrl }) {
 
 export function buildBuyEmbed({ w, hit, meta, sig }) {
   const mint = String(hit.mint || '').trim();
-  const sym = (meta.sym || mint.slice(0, 8)).toUpperCase();
-  const tokenName = (meta.name || '').trim();
-  const title = tokenName ? `🎯 ${sym} — ${tokenName}` : `🎯 ${sym}`;
-  const groupLine = w.groupEmoji && w.groupName ? `${w.groupEmoji} ${w.groupName}` : '—';
+  const sym = fmtTokenSym(meta, mint);
   const embedColor =
     typeof w.groupColor === 'number' && w.groupColor >= 0 ? w.groupColor : 0x7c3aed;
 
   const embed = new EmbedBuilder()
     .setColor(embedColor)
-    .setTitle(title)
+    .setTitle(`🎯 ${sym}`)
     .setDescription(
       [
-        `Wallet · ${w.label || w.addr?.slice(0, 8)}`,
-        `Groupe · ${groupLine}`,
+        `Wallet ${fmtWalletGroup(w)}`,
+        `MC - ${fmtMcShort(meta.mcUsd)}`,
         `Venue · ${venueLabel(hit.venue)}`,
-        `MC · ${fmtU(meta.mcUsd)}`,
         '',
-        `CA`,
-        mint,
+        `\`${mint}\``,
       ].join('\n'),
     )
     .setFooter({ text: sig ? `tx ${sig.slice(0, 16)}…` : 'Bundle Tracker' })
@@ -75,7 +70,7 @@ export function buildBuyEmbed({ w, hit, meta, sig }) {
   const img = resolveTokenImageUrl(mint, meta);
   if (img) {
     embed.setThumbnail(img);
-    embed.setAuthor({ name: sym, iconURL: img });
+    embed.setAuthor({ name: sym.replace(/^\$/, '').toUpperCase(), iconURL: img });
   }
 
   return embed;

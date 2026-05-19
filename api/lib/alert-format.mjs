@@ -30,7 +30,7 @@ export function fmtWalletGroup(w) {
 
 /** Bloc texte notif (3 lignes + lien optionnel). */
 export function buildBuyAlertText({ w, meta, mint, axiomUrl, withLink = true }) {
-  const m = String(mint || hit?.mint || '').trim();
+  const m = String(mint || '').trim();
   const sym = fmtTokenSym(meta, m);
   const mc = fmtMcShort(meta?.mcUsd);
 

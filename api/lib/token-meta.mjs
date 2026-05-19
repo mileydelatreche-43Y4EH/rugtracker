@@ -1,3 +1,5 @@
+import { buildBuyAlertText } from './alert-format.mjs';
+
 /** URL image token (meta → DexScreener → Pump CDN). */
 export function resolveTokenImageUrl(mint, meta = {}) {
   const direct = String(meta.imageUrl || '').trim();
@@ -154,12 +156,16 @@ export async function fetchTokenMetaFast(mint, rpcCall, keyIndex = 0) {
   return { sym, name, imageUrl, mcUsd, pairAddress, snap };
 }
 
-export function buildPhoneNtfyPayload(w, meta, mint) {
-  const label = w.label || w.addr?.slice(0, 8) || 'Bundle';
-  const sym = meta.sym || mint.slice(0, 6).toUpperCase();
-  const risk = meta.snap?.risk || 'UNKNOWN';
+export function buildPhoneNtfyPayload(w, meta, mint, axiomUrl = '') {
+  const { body, sym } = buildBuyAlertText({
+    w,
+    meta,
+    mint,
+    axiomUrl,
+    withLink: false,
+  });
   return {
-    title: `🎯 ${sym} — nouveau token`,
-    body: `${label}\nMC ${fmtU(meta.mcUsd)} · ${risk}`,
+    title: `🎯 ${sym}`,
+    body,
   };
 }
