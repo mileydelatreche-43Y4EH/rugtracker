@@ -33,16 +33,15 @@ export async function importJsonAttachment(att) {
   };
 }
 
-/** Bouton Importer : instructions. */
+/** Bouton Importer : guide vers /import (fichier depuis le PC). */
 export async function startJsonFileImport(interaction) {
   await interaction.reply({
     content: [
       '📥 **Importer backup**',
       '',
-      'Envoie **`wallets-export.json`** ou **`bundle-tracker-backup.json`**',
-      '**dans ce salon** (glisse-dépose le fichier sur le chat).',
+      'Tape **`/import`** → **fichier** → choisis ton `.json` sur ton PC.',
       '',
-      '_Export site ou bot — le bot réagit ✅ automatiquement._',
+      '_Export site ou **Exporter .json** du bot — pas de copier-coller._',
     ].join('\n'),
     ephemeral: true,
   });

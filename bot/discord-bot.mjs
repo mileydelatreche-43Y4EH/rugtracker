@@ -64,7 +64,7 @@ import {
   handleAlertsPanelButton,
   isAlertsPanelId,
 } from './discord-alerts-handlers.mjs';
-import { startJsonFileImport, handleJsonImportMessage } from './discord-import.mjs';
+import { startJsonFileImport, importJsonAttachment } from './discord-import.mjs';
 
 function loadEnvFile() {
   const p = new URL('../.env', import.meta.url);
@@ -126,21 +126,30 @@ loadTradeSettings();
 
 const uiCtx = () => ({ heliusCount: HELIUS_KEYS.length, channelId: CHANNEL_ID });
 
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-  ],
-});
+// Uniquement Guilds — pas de Message Content (évite "Used disallowed intents" sans config portail Discord).
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 let alertChannel = null;
 let panelMessage = null;
 let notifyCtx = { discordChannel: null, ntfyTopic: '' };
 let workerHandle = null;
 
-async function registerMenuCommand() {
+async function registerSlashCommands() {
   const rest = new REST({ version: '10' }).setToken(TOKEN);
-  const commands = [{ name: 'menu', description: 'Ouvre le menu principal du bot' }];
+  const commands = [
+    { name: 'menu', description: 'Ouvre le menu principal du bot' },
+    {
+      name: 'import',
+      description: 'Importer un backup .json (export site ou bot)',
+      options: [
+        {
+          name: 'fichier',
+          description: 'wallets-export.json ou bundle-tracker-backup.json',
+          type: 11,
+          required: true,
+        },
+      ],
+    },
+  ];
   try {
     if (GUILD_ID) {
       await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
@@ -148,7 +157,7 @@ async function registerMenuCommand() {
     } else {
       await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
     }
-    console.log('✅ Commande /menu enregistrée');
+    console.log('✅ Commandes /menu et /import enregistrées');
   } catch (e) {
     console.warn('Slash register', e.message || e);
   }
@@ -381,16 +390,32 @@ async function handleInteraction(interaction) {
   }
 
   if (interaction.isChatInputCommand()) {
+    if (!isAdmin(interaction.user.id)) {
+      await deny(interaction);
+      return;
+    }
     if (interaction.commandName === 'menu') {
-      if (!isAdmin(interaction.user.id)) {
-        await deny(interaction);
-        return;
-      }
       void updatePanel('home');
       await interaction.reply({
         ...(await buildHomePanel()),
         ephemeral: true,
       });
+      return;
+    }
+    if (interaction.commandName === 'import') {
+      const att = interaction.options.getAttachment('fichier', true);
+      await interaction.deferReply({ ephemeral: true });
+      try {
+        const r = await importJsonAttachment(att);
+        if (workerHandle) void workerHandle.resync();
+        void updatePanel('home');
+        await interaction.editReply(
+          `✅ **Import OK** · \`${r.fileName}\`\n` +
+            `**${r.wallets}** wallet(s) · **${r.groups}** groupe(s) · **${r.active}** actif(s) pour les alertes.`,
+        );
+      } catch (e) {
+        await interaction.editReply(`❌ Import : ${e.message || e}`);
+      }
       return;
     }
     return;
@@ -459,7 +484,7 @@ client.once('ready', async () => {
   console.log(`🤖 Discord connecté : ${client.user.tag}`);
   console.log(`📂 Fichier wallets : ${resolvePersistPath('wallets.json', 'WALLET_STORE_PATH', 'data/wallets.json')}`);
 
-  await registerMenuCommand();
+  await registerSlashCommands();
 
   alertChannel = await client.channels.fetch(CHANNEL_ID);
   if (!alertChannel?.isTextBased()) {
@@ -489,17 +514,7 @@ client.on('interactionCreate', interaction => {
   void handleInteraction(interaction);
 });
 
-client.on('messageCreate', message => {
-  void handleJsonImportMessage(message, {
-    channelId: CHANNEL_ID,
-    isAdmin,
-    onDone: async () => {
-      if (workerHandle) void workerHandle.resync();
-      void updatePanel('home').catch(() => {});
-    },
-  });
-});
-
 console.log(`Bundle Tracker · ${HELIUS_KEYS.length} clé(s) Helius · salon ${CHANNEL_ID}`);
+console.log('🔌 Intents Discord : Guilds uniquement (import via /import)');
 
 await client.login(TOKEN);
