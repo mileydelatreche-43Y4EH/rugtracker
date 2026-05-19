@@ -1,3 +1,5 @@
+import { silentMessage } from '../api/lib/discord-silent.mjs';
+
 /** Durée avant suppression auto des éphémères (import, erreurs, copier CA). */
 export const EPHEMERAL_TTL_MS = Number(process.env.EPHEMERAL_TTL_MS || 5000);
 
@@ -12,7 +14,7 @@ export function isUnknownInteraction(err) {
  */
 export async function safePanelUpdate(interaction, getPayload) {
   const raw = typeof getPayload === 'function' ? getPayload() : getPayload;
-  const payload = await raw;
+  const payload = silentMessage(await raw);
 
   try {
     if (!interaction.deferred && !interaction.replied) {

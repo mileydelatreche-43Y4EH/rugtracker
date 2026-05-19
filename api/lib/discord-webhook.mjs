@@ -1,4 +1,5 @@
 import { buildBuyButtons, buildBuyEmbed, buildBuyLinks } from './discord-alert.mjs';
+import { silentWebhookBody } from './discord-silent.mjs';
 
 function webhookUrlWithWait(url) {
   const u = String(url || '').trim();
@@ -20,7 +21,7 @@ export async function postDiscordWebhook(webhookUrl, body) {
   const r = await fetch(webhookUrlWithWait(webhookUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(silentWebhookBody(body)),
   });
   if (!r.ok) {
     const t = await r.text().catch(() => '');

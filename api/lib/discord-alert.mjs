@@ -7,6 +7,7 @@ import {
 import { buildBuyAlertText, fmtTokenSym, fmtWalletGroup, fmtMcShort } from './alert-format.mjs';
 import { pairButtonRows } from './discord-button-rows.mjs';
 import { rememberAlertContext } from './alert-context.mjs';
+import { silentMessage } from './discord-silent.mjs';
 
 export const COPY_CA_PREFIX = 'bt:ca:';
 /** Ancien menu token (messages déjà envoyés). */
@@ -132,16 +133,18 @@ export async function sendDiscordBuyAlert(channel, payload) {
   if (!channel?.send) throw new Error('Canal Discord invalide');
   const body = buildAlertPayload(payload);
   try {
-    return await channel.send(body);
+    return await channel.send(silentMessage(body));
   } catch (e) {
     const msg = String(e.message || e);
     if (!msg.includes('COMPONENT') && !msg.includes('50035') && !msg.includes('button')) {
       throw e;
     }
-    return channel.send({
-      embeds: body.embeds,
-      components: body.components.slice(0, 2),
-    });
+    return channel.send(
+      silentMessage({
+        embeds: body.embeds,
+        components: body.components.slice(0, 2),
+      }),
+    );
   }
 }
 
@@ -150,14 +153,16 @@ export async function enrichDiscordBuyAlert(message, payload) {
   if (!message?.edit) return null;
   const body = buildAlertPayload(payload);
   try {
-    return await message.edit(body);
+    return await message.edit(silentMessage(body));
   } catch (e) {
     const msg = String(e.message || e);
     if (msg.includes('COMPONENT') || msg.includes('50035')) {
-      return message.edit({
-        embeds: body.embeds,
-        components: body.components.slice(0, 2),
-      });
+      return message.edit(
+        silentMessage({
+          embeds: body.embeds,
+          components: body.components.slice(0, 2),
+        }),
+      );
     }
     throw e;
   }
@@ -169,5 +174,5 @@ export async function sendDiscordPlain(channel, title, description) {
     .setTitle(title)
     .setDescription(description)
     .setTimestamp();
-  return channel.send({ embeds: [embed] });
+  return channel.send(silentMessage({ embeds: [embed] }));
 }

@@ -12,6 +12,7 @@ import {
 } from '../api/lib/discord-alert.mjs';
 import { fetchTokenMetaFast } from '../api/lib/token-meta.mjs';
 import { axiomTradeUrl } from '../api/lib/axiom.mjs';
+import { silentMessage } from '../api/lib/discord-silent.mjs';
 import { notifyBuyAlert } from '../api/lib/notify-buy.mjs';
 import {
   addWallet,
@@ -157,7 +158,7 @@ async function registerSlashCommands() {
 async function updatePanel(screen = 'home') {
   if (!panelMessage) return;
   const payload = await renderScreen(screen, uiCtx());
-  await panelMessage.edit(payload);
+  await panelMessage.edit(silentMessage(payload));
 }
 
 async function sendTestAlert() {
@@ -314,7 +315,7 @@ async function handleInteraction(interaction) {
     }
     void updatePanel('home');
     await interaction.reply({
-      ...(await buildHomePanel()),
+      ...(await buildHomePanel(uiCtx())),
       ephemeral: true,
     });
     return;
@@ -337,7 +338,7 @@ async function handleInteraction(interaction) {
     if (interaction.commandName === 'menu') {
       void updatePanel('home');
       await interaction.reply({
-        ...(await buildHomePanel()),
+        ...(await buildHomePanel(uiCtx())),
         ephemeral: true,
       });
       return;
@@ -394,12 +395,12 @@ async function handleInteraction(interaction) {
 }
 
 async function setupPanel() {
-  const payload = await buildHomePanel();
+  const payload = await buildHomePanel(uiCtx());
 
   if (PANEL_MESSAGE_ID) {
     try {
       panelMessage = await alertChannel.messages.fetch(PANEL_MESSAGE_ID);
-      await panelMessage.edit(payload);
+      await panelMessage.edit(silentMessage(payload));
       console.log(`✅ Panneau mis à jour (message ${PANEL_MESSAGE_ID})`);
       return;
     } catch {
@@ -407,7 +408,7 @@ async function setupPanel() {
     }
   }
 
-  panelMessage = await alertChannel.send(payload);
+  panelMessage = await alertChannel.send(silentMessage(payload));
   try {
     await panelMessage.pin();
   } catch {
