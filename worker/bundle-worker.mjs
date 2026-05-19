@@ -165,7 +165,6 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
     for (const box of wsBoxes) {
       box.stopped = true;
       if (box.reconnectTimer) clearTimeout(box.reconnectTimer);
-      if (box.pingTimer) clearInterval(box.pingTimer);
       try {
         box.ws?.close();
       } catch {}
@@ -203,7 +202,6 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
       stopped: false,
       ws: null,
       reconnectTimer: null,
-      pingTimer: null,
       backoffMs: 3000,
       mode: useTxSubscribe ? 'tx' : 'logs',
       logSubByRpcId: new Map(),
@@ -254,10 +252,6 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
         box.backoffMs = 3000;
         box.logSubByRpcId.clear();
         subscribe(ws);
-        if (box.pingTimer) clearInterval(box.pingTimer);
-        box.pingTimer = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) ws.ping();
-        }, 25000);
         const mode = box.mode === 'tx' ? 'txSubscribe' : 'logsSubscribe';
         console.log(`✅ WS clé #${keyIndex + 1} · ${mode} · ${keyWallets.length} wallet(s)`);
       };
@@ -312,10 +306,6 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
 
       ws.onclose = () => {
         box.ws = null;
-        if (box.pingTimer) {
-          clearInterval(box.pingTimer);
-          box.pingTimer = null;
-        }
         if (box.stopped) return;
         if (box.reconnectTimer) return;
         const wait = box.backoffMs;
