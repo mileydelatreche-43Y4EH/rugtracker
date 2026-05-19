@@ -5,7 +5,9 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { fmtU, resolveTokenImageUrl } from './token-meta.mjs';
+import { buildBuyAlertText, fmtTokenSym, fmtWalletGroup, fmtMcShort } from './alert-format.mjs';
 import { buildTradeButtonRows } from './discord-trade.mjs';
+import { pairButtonRows } from './discord-button-rows.mjs';
 import { loadTradeSettings } from './trade-settings.mjs';
 import { rememberAlertContext } from './alert-context.mjs';
 
@@ -37,20 +39,11 @@ function linkBtn(label, url) {
   return new ButtonBuilder().setLabel(label).setStyle(ButtonStyle.Link).setURL(url);
 }
 
-/** Texte sans markdown — lisible dans les toasts Windows Discord. */
+/** Texte toast Windows — format compact sans markdown. */
 export function buildBuyAlertContent({ w, hit, meta, axiomUrl }) {
   const mint = String(hit.mint || '').trim();
-  const sym = (meta.sym || mint.slice(0, 8)).toUpperCase();
-  const groupLine = w.groupEmoji && w.groupName ? `${w.groupEmoji} ${w.groupName}` : '—';
   const link = axiomUrl || buildBuyLinks(mint, '', axiomUrl).axiom;
-  return [
-    link,
-    '',
-    `🎯 ${sym} · Wallet ${w.label || w.addr?.slice(0, 8)}`,
-    `Groupe ${groupLine} · ${venueLabel(hit.venue)} · MC ${fmtU(meta.mcUsd)}`,
-  ]
-    .join('\n')
-    .slice(0, 2000);
+  return buildBuyAlertText({ w, meta, mint, axiomUrl: link, withLink: true }).body.slice(0, 2000);
 }
 
 export function buildBuyEmbed({ w, hit, meta, sig }) {
@@ -100,12 +93,10 @@ export function clampAlertComponents(rows) {
 
 export function buildBuyButtons(links, mint) {
   const m = String(mint || '').trim();
-  const row1 = new ActionRowBuilder().addComponents(
+  const core = [
     linkBtn('⚡ Axiom', links.axiom),
     linkBtn('🐸 Pump', links.pump),
     linkBtn('📈 Dex', links.dex),
-  );
-  const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`${COPY_CA_PREFIX}${m}`)
       .setLabel('📋 Copier CA')
@@ -114,8 +105,8 @@ export function buildBuyButtons(links, mint) {
       .setCustomId(ALERT_BOT_HOME)
       .setLabel('🏠 Menu bot')
       .setStyle(ButtonStyle.Primary),
-  );
-  const rows = [row1, row2];
+  ];
+  const rows = pairButtonRows(core, 3);
   const tradeRows = buildTradeButtonRows(m);
   if (tradeRows.length) rows.push(...tradeRows);
   return clampAlertComponents(rows);
@@ -127,19 +118,15 @@ export function buildAlertComponents(links, mint) {
 
 export function buildAlertMenuComponents(links, mint) {
   const m = String(mint || '').trim();
-  return [
-    new ActionRowBuilder().addComponents(
-      linkBtn('🔍 Solscan', links.solscan),
-      linkBtn('🦅 Birdeye', links.birdeye),
-      linkBtn('📈 Dex', links.dex),
-    ),
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`${COPY_CA_PREFIX}${m}`)
-        .setLabel('📋 Copier CA')
-        .setStyle(ButtonStyle.Secondary),
-    ),
-  ];
+  return pairButtonRows([
+    linkBtn('🔍 Solscan', links.solscan),
+    linkBtn('🦅 Birdeye', links.birdeye),
+    linkBtn('📈 Dex', links.dex),
+    new ButtonBuilder()
+      .setCustomId(`${COPY_CA_PREFIX}${m}`)
+      .setLabel('📋 Copier CA')
+      .setStyle(ButtonStyle.Secondary),
+  ]);
 }
 
 function buildAlertPayload(payload) {

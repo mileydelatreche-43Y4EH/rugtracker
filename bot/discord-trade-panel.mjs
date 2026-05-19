@@ -1,14 +1,23 @@
 import {
   ActionRowBuilder,
-  ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
   ModalBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js';
+import {
+  UI_COLORS,
+  uiBtn,
+  uiEmbed,
+  uiRow,
+  uiRowsPair,
+  uiClampRows,
+  btnHome,
+  btnBack,
+  navBackHome,
+} from './discord-components.mjs';
 import {
   loadTradeSettings,
   patchTradeSettings,
@@ -25,10 +34,9 @@ import {
   formatWalletsBalanceBlock,
 } from '../api/lib/wallet-balances.mjs';
 
-const TRADE_COLOR = 0x22c55e;
-
 export const TCID = {
   MENU: 'bt:trade',
+  ADVANCED: 'bt:trade:adv',
   TOGGLE: 'bt:trade:on',
   BTNS: 'bt:trade:btns',
   BUY_PRESETS: 'bt:trade:buyp',
@@ -55,63 +63,73 @@ export const TCID = {
   MODAL_CUSTOM_SELL: 'bt:modal:trcs:',
 };
 
-function tbtn(id, label, style = ButtonStyle.Secondary) {
-  return new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
-}
-
-function trow(...buttons) {
-  return new ActionRowBuilder().addComponents(...buttons.slice(0, 5));
-}
-
-function tradeEmbed(title, description) {
-  return new EmbedBuilder().setColor(TRADE_COLOR).setTitle(title).setDescription(description);
-}
-
 export async function buildTradeMenu() {
   const s = loadTradeSettings();
   const balances = await fetchTradeWalletBalances();
   const prio = formatPriorityFeeAxiom(s.priorityFeeLamports);
   const walletBlock = formatWalletsBalanceBlock(balances, s.enabledWalletIds);
 
-  const embed = tradeEmbed(
+  const embed = uiEmbed(
+    UI_COLORS.trade,
     '💹 Trading Jupiter',
     [
       ...tradeSettingsSummary(s),
       '',
       '**🔑 Wallets & soldes**',
-      walletBlock.slice(0, 1800),
-      '',
-      '_Clés privées sur le serveur uniquement. Priority fee : clique ⚡ pour changer (Normal → Fast → Turbo → Ultra)._',
+      walletBlock.slice(0, 1600),
     ].join('\n'),
+    { footer: '⚡ Fee : cycle Normal → Fast → Turbo → Ultra · menu Avancé pour le reste' },
   );
 
-  const onOff = s.tradingEnabled ? '🔴 Désactiver trading' : '🟢 Activer trading';
+  const onOff = s.tradingEnabled ? '🔴 Stop trading' : '🟢 Activer trading';
   const onStyle = s.tradingEnabled ? ButtonStyle.Danger : ButtonStyle.Success;
-  const prioBtnLabel = `Fee ${prio.tier}`.slice(0, 80);
+  const prioBtnLabel = `Fee ${prio.tier}`.slice(0, 40);
 
   return {
     embeds: [embed],
-    components: [
-      trow(tbtn(TCID.TOGGLE, onOff, onStyle)),
-      trow(
-        tbtn(TCID.BUY_PRESETS, '💰 Achats'),
-        tbtn(TCID.SELL_PRESETS, '📤 Ventes'),
-        tbtn(TCID.SLIP, '🎚️ Slippage'),
-      ),
-      trow(
-        tbtn(TCID.PRIO, `⚡ ${prioBtnLabel}`),
-        tbtn(TCID.PRIO_CUSTOM, '⛽ Fee SOL'),
-        tbtn(TCID.MULTI, `👥 ${s.multiWalletMode}`),
-        tbtn(TCID.RESERVE, `🛡️ ${formatSolLabel(s.minSolReserve)}`),
-      ),
-      trow(
-        tbtn(TCID.REFRESH_BAL, '💰 Soldes'),
-        tbtn(TCID.WALLETS, '🔑 Wallets', ButtonStyle.Primary),
-        tbtn(TCID.BTNS, s.showTradeButtonsOnAlerts ? '🔕 Alertes' : '🔔 Alertes'),
-        tbtn(TCID.SNIPE, '🎯 Snipe', ButtonStyle.Primary),
-        tbtn('bt:settings', '⬅️ Paramètres'),
-      ),
-    ],
+    components: uiClampRows(
+      uiRowsPair([
+        uiBtn(TCID.TOGGLE, onOff, onStyle),
+        uiBtn(TCID.REFRESH_BAL, '💰 Rafraîchir', ButtonStyle.Secondary),
+        uiBtn(TCID.BUY_PRESETS, '💰 Montants buy', ButtonStyle.Secondary),
+        uiBtn(TCID.SELL_PRESETS, '📤 Montants sell', ButtonStyle.Secondary),
+        uiBtn(TCID.SLIP, '🎚️ Slippage', ButtonStyle.Secondary),
+        uiBtn(TCID.PRIO, `⚡ ${prioBtnLabel}`, ButtonStyle.Secondary),
+        uiBtn(TCID.WALLETS, '🔑 Wallets clés', ButtonStyle.Primary),
+        uiBtn(TCID.SNIPE, '🎯 Snipe', ButtonStyle.Primary),
+        uiBtn(TCID.ADVANCED, '⚙️ Avancé', ButtonStyle.Secondary),
+        uiBtn('bt:settings', '🔧 Paramètres', ButtonStyle.Secondary),
+      ]).concat([uiRow(btnHome())]),
+    ),
+  };
+}
+
+export async function buildTradeAdvancedPanel() {
+  const s = loadTradeSettings();
+  const embed = uiEmbed(
+    UI_COLORS.trade,
+    '⚙️ Trading — avancé',
+    [
+      `**Multi-wallet** · \`${s.multiWalletMode}\``,
+      `**Réserve SOL** · ${formatSolLabel(s.minSolReserve)} min par wallet`,
+      `**Boutons sur alertes** · ${s.showTradeButtonsOnAlerts ? '🟢 visibles' : '⚫ masqués'}`,
+      '',
+      '_Priority fee custom en SOL · mode multi pour plusieurs clés._',
+    ].join('\n'),
+  );
+
+  return {
+    embeds: [embed],
+    components: uiClampRows(
+      uiRowsPair([
+        uiBtn(TCID.PRIO_CUSTOM, '⛽ Fee custom', ButtonStyle.Secondary),
+        uiBtn(TCID.MULTI, `👥 Multi: ${s.multiWalletMode}`, ButtonStyle.Secondary),
+        uiBtn(TCID.RESERVE, `🛡️ Réserve ${formatSolLabel(s.minSolReserve)}`, ButtonStyle.Secondary),
+        uiBtn(TCID.BTNS, s.showTradeButtonsOnAlerts ? '🔕 Masquer boutons' : '🔔 Afficher boutons', ButtonStyle.Secondary),
+        uiBtn(TCID.MENU, '⬅️ Trading', ButtonStyle.Primary),
+        btnHome(),
+      ]),
+    ),
   };
 }
 
@@ -129,15 +147,16 @@ export async function buildTradeWalletsPanel() {
     : ['_Aucun wallet — ajoute-en un ou définis TRADE_WALLETS_JSON sur Railway._'];
 
   const total = balances.reduce((sum, w) => sum + (w.sol ?? 0), 0);
-  const embed = tradeEmbed(
+  const embed = uiEmbed(
+    UI_COLORS.trade,
     '🔑 Wallets de trading',
     [`**Total** · **${formatSolLabel(total)}**`, '', ...lines].join('\n\n').slice(0, 3900),
   );
 
-  const components = [
-    trow(tbtn(TCID.WL_ADD, '➕ Ajouter clé', ButtonStyle.Success), tbtn(TCID.WL_RM, '🗑️ Retirer')),
-    trow(tbtn(TCID.MENU, '⬅️ Trading')),
-  ];
+  const components = uiClampRows([
+    uiRow(uiBtn(TCID.WL_ADD, '➕ Ajouter clé', ButtonStyle.Success), uiBtn(TCID.WL_RM, '🗑️ Retirer', ButtonStyle.Danger)),
+    navBackHome(TCID.MENU),
+  ]);
 
   if (balances.length) {
     components.unshift(
@@ -164,14 +183,15 @@ export async function buildTradeWalletsPanel() {
 
 export function buildTradeWalletRemoveSelect() {
   const fileWallets = listTradeWalletsPublic().filter(w => w.source === 'file');
-  const embed = tradeEmbed(
+  const embed = uiEmbed(
+    UI_COLORS.trade,
     '➖ Retirer wallet trading',
     fileWallets.length
       ? 'Seuls les wallets ajoutés via le bot (fichier) peuvent être retirés ici.'
       : '_Aucun wallet fichier — ceux en variable env se retirent dans Railway._',
   );
 
-  const components = [trow(tbtn(TCID.WALLETS, '⬅️ Wallets'))];
+  const components = [navBackHome(TCID.WALLETS)];
   if (fileWallets.length) {
     components.unshift(
       new ActionRowBuilder().addComponents(
@@ -367,6 +387,7 @@ export function parsePresetList(raw, isPct = false) {
 
 export function resolveTradeScreen(id) {
   if (id === TCID.MENU) return 'trade';
+  if (id === TCID.ADVANCED) return 'trade_adv';
   if (id === TCID.WALLETS) return 'trade_wallets';
   if (id === TCID.WL_RM) return 'trade_wl_rm';
   if (id === TCID.SNIPE) return 'sniping';
@@ -377,6 +398,8 @@ export async function renderTradeScreen(screen) {
   switch (screen) {
     case 'trade':
       return await buildTradeMenu();
+    case 'trade_adv':
+      return await buildTradeAdvancedPanel();
     case 'trade_wallets':
       return await buildTradeWalletsPanel();
     case 'trade_wl_rm':

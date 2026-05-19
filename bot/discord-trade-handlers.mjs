@@ -47,6 +47,11 @@ export async function handleTradePanelButton(interaction) {
     return true;
   }
 
+  if (id === TCID.ADVANCED) {
+    await updateTradeScreen(interaction, 'trade_adv');
+    return true;
+  }
+
   if (id === TCID.TOGGLE) {
     const s = loadTradeSettings();
     patchTradeSettings({ tradingEnabled: !s.tradingEnabled });
@@ -57,7 +62,7 @@ export async function handleTradePanelButton(interaction) {
   if (id === TCID.BTNS) {
     const s = loadTradeSettings();
     patchTradeSettings({ showTradeButtonsOnAlerts: !s.showTradeButtonsOnAlerts });
-    await updateTradeScreen(interaction, 'trade');
+    await updateTradeScreen(interaction, 'trade_adv');
     return true;
   }
 
@@ -98,7 +103,7 @@ export async function handleTradePanelButton(interaction) {
 
   if (id === TCID.MULTI) {
     cycleMultiWalletMode();
-    await updateTradeScreen(interaction, 'trade');
+    await updateTradeScreen(interaction, 'trade_adv');
     return true;
   }
 

@@ -1,7 +1,8 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { ButtonBuilder, ButtonStyle } from 'discord.js';
 import { loadTradeSettings } from './trade-settings.mjs';
 import { listTradeWalletsPublic } from './trade-wallets.mjs';
 import { formatSolLabel } from './trade-format.mjs';
+import { pairButtonRows } from './discord-button-rows.mjs';
 
 export const TRADE_BUY_PREFIX = 'bt:tb:';
 export const TRADE_SELL_PREFIX = 'bt:ts:';
@@ -63,48 +64,39 @@ export function buildTradeButtonRows(mint) {
   if (!listTradeWalletsPublic().length) return [];
 
   const m = String(mint || '').trim();
-  const buys = s.buyPresetsSol.slice(0, 3);
-  const sells = s.sellPresetsPct.slice(0, 3);
+  const buys = s.buyPresetsSol.slice(0, 2);
+  const sells = s.sellPresetsPct.slice(0, 2);
 
-  const rowBuy = new ActionRowBuilder().addComponents(
+  const buttons = [
     ...buys.map((sol, i) =>
       new ButtonBuilder()
         .setCustomId(tradeBuyId(m, i))
-        .setLabel(`💰 Buy ${formatSolLabel(sol)}`.slice(0, 80))
+        .setLabel(`💰 ${formatSolLabel(sol)}`.slice(0, 80))
         .setStyle(ButtonStyle.Success),
     ),
     new ButtonBuilder()
       .setCustomId(tradeCustomBuyId(m))
       .setLabel('✏️ Buy…')
       .setStyle(ButtonStyle.Secondary),
-  );
-
-  const rowSell = new ActionRowBuilder().addComponents(
     ...sells.map((pct, i) =>
       new ButtonBuilder()
         .setCustomId(tradeSellId(m, i))
-        .setLabel(`📤 Sell ${pct}%`)
+        .setLabel(`📤 ${pct}%`)
         .setStyle(ButtonStyle.Danger),
     ),
     new ButtonBuilder()
       .setCustomId(tradeMultiId(m))
-      .setLabel('👥 Multi-buy')
+      .setLabel('👥 Multi')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId(tradeCustomSellId(m))
       .setLabel('✏️ Sell…')
       .setStyle(ButtonStyle.Secondary),
-  );
+  ];
 
-  return [rowBuy, rowSell];
+  return pairButtonRows(buttons, 2);
 }
 
 export function isTradeButtonId(id) {
-  return (
-    id?.startsWith(TRADE_BUY_PREFIX) ||
-    id?.startsWith(TRADE_SELL_PREFIX) ||
-    id?.startsWith(TRADE_MULTI_PREFIX) ||
-    id?.startsWith(TRADE_CUSTOM_BUY_PREFIX) ||
-    id?.startsWith(TRADE_CUSTOM_SELL_PREFIX)
-  );
+  return !!parseTradeButtonId(id);
 }

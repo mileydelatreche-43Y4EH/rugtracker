@@ -1,29 +1,29 @@
 import {
   ActionRowBuilder,
   AttachmentBuilder,
-  ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
   ModalBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js';
-import {
-  loadStore,
-  storeSummary,
-} from '../api/lib/wallet-store.mjs';
+import { loadStore, storeSummary } from '../api/lib/wallet-store.mjs';
 import { loadTradeSettings } from '../api/lib/trade-settings.mjs';
-import {
-  fetchTradeWalletBalances,
-  formatHomeWalletsBlock,
-} from '../api/lib/wallet-balances.mjs';
+import { fetchTradeWalletBalances, formatHomeWalletsBlock } from '../api/lib/wallet-balances.mjs';
 import { renderTradeScreen } from './discord-trade-panel.mjs';
 import { renderSnipeScreen } from './discord-snipe-panel.mjs';
 import { buildAlertsLivePanel } from './discord-alerts-panel.mjs';
-
-const PANEL_COLOR = 0x5865f2;
+import {
+  UI_COLORS,
+  uiBtn,
+  uiEmbed,
+  uiRow,
+  uiRowsPair,
+  uiClampRows,
+  btnHome,
+  navBackHome,
+} from './discord-components.mjs';
 
 export const CID = {
   HOME: 'bt:home',
@@ -40,6 +40,7 @@ export const CID = {
   SETTINGS: 'bt:settings',
   ALERTS_LIVE: 'bt:alerts:live',
   TRADING: 'bt:trade',
+  SNIPE: 'bt:snipe',
   TEST: 'bt:test',
   EXPORT: 'bt:export',
   IMPORT: 'bt:import',
@@ -52,23 +53,6 @@ export const CID = {
   MODAL_GR_ADD: 'bt:modal:gradd',
 };
 
-function btn(id, label, emoji) {
-  const text = emoji ? `${emoji} ${label}` : label;
-  return new ButtonBuilder().setCustomId(id).setLabel(text.slice(0, 80)).setStyle(ButtonStyle.Secondary);
-}
-
-function row(...buttons) {
-  return new ActionRowBuilder().addComponents(...buttons.slice(0, 5));
-}
-
-function backHome() {
-  return btn(CID.HOME, 'Accueil', '🏠');
-}
-
-function panelEmbed(title, description) {
-  return new EmbedBuilder().setColor(PANEL_COLOR).setTitle(title).setDescription(description);
-}
-
 export async function buildHomePanel() {
   const balances = await fetchTradeWalletBalances();
   const s = loadTradeSettings();
@@ -76,45 +60,70 @@ export async function buildHomePanel() {
   const store = loadStore();
   const tracked = store.groups.reduce((n, g) => n + g.wallets.length, 0);
   const groups = store.groups.length;
+  const tradeOn = s.tradingEnabled ? '🟢 ON' : '⚫ OFF';
 
-  const embed = panelEmbed(
+  const embed = uiEmbed(
+    UI_COLORS.home,
     '◈ Bundle Tracker',
     [
-      `▶ **${tracked}** wallet(s) suivis · **${groups}** groupe(s)`,
+      'Panneau de contrôle — tout se fait avec les boutons ci-dessous.',
       '',
-      '**💼 Tes wallets**',
-      walletBlock.slice(0, 3500),
+      walletBlock.slice(0, 2800),
     ].join('\n'),
+    {
+      footer: 'Surveillance Helius · alertes instantanées',
+      fields: [
+        { name: '👀 Suivis', value: `${tracked} wallets`, inline: true },
+        { name: '🗂️ Groupes', value: String(groups), inline: true },
+        { name: '💹 Trading', value: tradeOn, inline: true },
+      ],
+    },
   );
 
   return {
     embeds: [embed],
-    components: [
-      row(btn(CID.WALLETS, 'Wallets', '💼'), btn(CID.GROUPS, 'Groupes', '🗂️')),
-      row(
-        btn(CID.STATUS, 'Statut', '📡'),
-        btn(CID.SETTINGS, 'Paramètres', '⚙️'),
-        btn(CID.HOME_BAL, 'Soldes', '💰'),
-      ),
-    ],
+    components: uiClampRows(
+      uiRowsPair([
+        uiBtn(CID.WALLETS, '💼 Wallets', ButtonStyle.Primary),
+        uiBtn(CID.GROUPS, '🗂️ Groupes', ButtonStyle.Primary),
+        uiBtn(CID.TRADING, '💹 Trading', ButtonStyle.Success),
+        uiBtn(CID.SNIPE, '🎯 Snipe', ButtonStyle.Success),
+        uiBtn(CID.ALERTS_LIVE, '🔔 Alertes', ButtonStyle.Secondary),
+        uiBtn(CID.SETTINGS, '⚙️ Paramètres', ButtonStyle.Secondary),
+        uiBtn(CID.STATUS, '📡 Statut', ButtonStyle.Secondary),
+        uiBtn(CID.HOME_BAL, '💰 Soldes', ButtonStyle.Secondary),
+        uiBtn(CID.IMPORT, '📥 Import', ButtonStyle.Secondary),
+        uiBtn(CID.EXPORT, '📤 Export', ButtonStyle.Secondary),
+      ]),
+    ),
   };
 }
 
 export function buildWalletsMenu() {
   const sum = storeSummary();
-  const embed = panelEmbed('💼 Wallets', `**${sum.activeCount}** wallet(s) surveillé(s).`);
+  const embed = uiEmbed(
+    UI_COLORS.wallets,
+    '💼 Wallets surveillés',
+    [
+      `**${sum.activeCount}** wallet(s) actifs pour les alertes.`,
+      '',
+      'Ajoute des adresses Solana, importe un backup ou gère la liste.',
+    ].join('\n'),
+    { footer: 'Les wallets inactifs (groupe en pause) ne déclenchent pas d’alerte' },
+  );
 
   return {
     embeds: [embed],
-    components: [
-      row(
-        btn(CID.WL_LIST, 'Liste', '📋'),
-        btn(CID.WL_ADD, 'Ajouter', '➕'),
-        btn(CID.WL_RM, 'Retirer', '🗑️'),
-      ),
-      row(btn(CID.IMPORT, 'Import .json', '📥'), btn(CID.EXPORT, 'Export .json', '📤')),
-      row(backHome()),
-    ],
+    components: uiClampRows([
+      ...uiRowsPair([
+        uiBtn(CID.WL_LIST, '📋 Liste complète', ButtonStyle.Secondary),
+        uiBtn(CID.WL_ADD, '➕ Ajouter', ButtonStyle.Success),
+        uiBtn(CID.WL_RM, '🗑️ Retirer', ButtonStyle.Danger),
+        uiBtn(CID.IMPORT, '📥 Import .json', ButtonStyle.Secondary),
+        uiBtn(CID.EXPORT, '📤 Export .json', ButtonStyle.Secondary),
+      ]),
+      uiRow(btnHome()),
+    ]),
   };
 }
 
@@ -127,11 +136,11 @@ export function buildWalletsList() {
       )
     : ['_Aucun wallet actif._'];
 
-  const embed = panelEmbed('📋 Liste des wallets', lines.join('\n\n').slice(0, 4000));
+  const embed = uiEmbed(UI_COLORS.wallets, '📋 Liste des wallets', lines.join('\n\n').slice(0, 4000));
 
   return {
     embeds: [embed],
-    components: [row(btn(CID.WALLETS, 'Retour', '⬅️'), backHome())],
+    components: [navBackHome(CID.WALLETS)],
   };
 }
 
@@ -150,50 +159,60 @@ export function buildWalletRemoveSelect() {
     }
   }
 
-  const embed = panelEmbed(
-    '➖ Retirer un wallet',
-    options.length ? 'Choisis dans le menu :' : '_Aucun wallet._',
+  const embed = uiEmbed(
+    UI_COLORS.wallets,
+    '🗑️ Retirer un wallet',
+    options.length ? 'Sélectionne le wallet à supprimer :' : '_Aucun wallet enregistré._',
   );
 
-  const components = [row(backHome())];
+  const components = [navBackHome(CID.WALLETS)];
   if (options.length) {
     components.unshift(
       new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId(CID.SEL_RM_WL)
-          .setPlaceholder('Wallet à retirer…')
+          .setPlaceholder('🔻 Choisir un wallet…')
           .addOptions(options),
       ),
     );
   }
 
-  return { embeds: [embed], components };
+  return { embeds: [embed], components: uiClampRows(components) };
 }
 
 export function buildGroupsMenu() {
-  const embed = panelEmbed('📁 Groupes', 'Créer, mettre en pause ou lister tes groupes.');
+  const store = loadStore();
+  const embed = uiEmbed(
+    UI_COLORS.groups,
+    '🗂️ Groupes',
+    [
+      `**${store.groups.length}** groupe(s) · organise tes wallets par stratégie.`,
+      '',
+      'Pause un groupe pour couper toutes ses alertes d’un coup.',
+    ].join('\n'),
+  );
 
   return {
     embeds: [embed],
-    components: [
-      row(
-        btn(CID.GR_LIST, 'Liste', '📋'),
-        btn(CID.GR_ADD, 'Créer', '✨'),
-        btn(CID.GR_PAUSE, 'Pause', '⏸️'),
-      ),
-      row(btn(CID.GR_RESUME, 'Reprendre', '▶️')),
-      row(backHome()),
-    ],
+    components: uiClampRows([
+      ...uiRowsPair([
+        uiBtn(CID.GR_LIST, '📋 Voir groupes', ButtonStyle.Secondary),
+        uiBtn(CID.GR_ADD, '✨ Créer', ButtonStyle.Success),
+        uiBtn(CID.GR_PAUSE, '⏸️ Pause', ButtonStyle.Secondary),
+        uiBtn(CID.GR_RESUME, '▶️ Reprendre', ButtonStyle.Secondary),
+      ]),
+      uiRow(btnHome()),
+    ]),
   };
 }
 
 export function buildGroupsList() {
   const sum = storeSummary();
-  const embed = panelEmbed('📋 Groupes', sum.lines.join('\n') || '_Aucun groupe._');
+  const embed = uiEmbed(UI_COLORS.groups, '📋 Tous les groupes', sum.lines.join('\n') || '_Aucun groupe._');
 
   return {
     embeds: [embed],
-    components: [row(btn(CID.GROUPS, 'Retour', '⬅️'), backHome())],
+    components: [navBackHome(CID.GROUPS)],
   };
 }
 
@@ -209,78 +228,94 @@ export function buildGroupSelect(customId, mode) {
         .setValue(g.id),
     );
 
-  const embed = panelEmbed(
-    mode === 'pause' ? '⏸ Pause groupe' : '▶ Reprendre groupe',
+  const embed = uiEmbed(
+    mode === 'pause' ? UI_COLORS.groups : UI_COLORS.groups,
+    mode === 'pause' ? '⏸️ Mettre en pause' : '▶️ Reprendre un groupe',
     options.length
-      ? 'Choisis dans le menu :'
+      ? 'Choisis le groupe :'
       : mode === 'pause'
-        ? '_Tous les groupes sont actifs._'
+        ? '_Tous les groupes sont déjà actifs._'
         : '_Aucun groupe en pause._',
   );
 
-  const components = [row(backHome())];
+  const components = [navBackHome(CID.GROUPS)];
   if (options.length) {
     components.unshift(
       new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId(customId)
-          .setPlaceholder('Groupe…')
+          .setPlaceholder(mode === 'pause' ? '⏸️ Groupe à pauser…' : '▶️ Groupe à relancer…')
           .addOptions(options),
       ),
     );
   }
 
-  return { embeds: [embed], components };
+  return { embeds: [embed], components: uiClampRows(components) };
 }
 
 export function buildStatusPanel(heliusCount, channelId) {
   const sum = storeSummary();
-  const embed = panelEmbed('📊 Statut', sum.lines.join('\n') || '_Aucun groupe._').addFields(
-    { name: 'Bot', value: '🟢 En ligne', inline: true },
-    { name: 'Wallets', value: String(sum.activeCount), inline: true },
-    { name: 'Helius', value: `${heliusCount} clé(s)`, inline: true },
-    { name: 'Salon', value: `<#${channelId}>`, inline: false },
+  const embed = uiEmbed(
+    UI_COLORS.home,
+    '📡 Statut du bot',
+    'État en temps réel du worker et de la configuration.',
+    {
+      fields: [
+        { name: '🤖 Bot', value: '🟢 En ligne', inline: true },
+        { name: '👛 Wallets actifs', value: String(sum.activeCount), inline: true },
+        { name: '⚡ Clés Helius', value: `${heliusCount}`, inline: true },
+        { name: '💬 Salon alertes', value: `<#${channelId}>`, inline: false },
+        { name: '📦 Groupes', value: sum.lines.slice(0, 6).join('\n') || '—', inline: false },
+      ],
+    },
   );
 
   return {
     embeds: [embed],
-    components: [row(backHome())],
+    components: uiClampRows([
+      uiRow(uiBtn(CID.REFRESH, '🔃 Resync worker', ButtonStyle.Secondary)),
+      uiRow(btnHome()),
+    ]),
   };
 }
 
 export function buildSettingsPanel(heliusCount) {
   const metaMs = process.env.NTFY_META_TIMEOUT_MS || '850';
-  const embed = panelEmbed(
-    '⚙️ Paramètres',
+  const ntfy = (process.env.NTFY_TOPIC || '').trim() ? '🟢 Configuré' : '⚫ Non configuré';
+  const embed = uiEmbed(
+    UI_COLORS.settings,
+    '⚙️ Paramètres & outils',
     [
-      '**Alertes live** — ON/OFF par wallet surveillé',
-      '**Trading** — achat/vente Jupiter depuis les alertes',
-      '**Test alerte** — fausse notif dans ce salon',
-      '**Actualiser** — relance la surveillance des wallets',
+      'Centre de configuration — chaque section a son propre menu.',
       '',
-      `⚡ Délai meta alertes : ~${metaMs} ms`,
-      '⚡ Détection : WebSocket Helius instantané (`processed`)',
-      '',
-      '_Notifs Windows : le clic ouvre Discord (pas Axiom direct). Le lien Axiom est en haut du message — ou bouton ⚡ Axiom._',
-      '_Clic direct Axiom : configure **NTFY_TOPIC** sur Railway + app ntfy (même topic)._',
+      `📱 **ntfy (clic → Axiom)** · ${ntfy}`,
+      `⚡ **Meta alertes** · ~${metaMs} ms`,
+      `🔑 **Helius** · ${heliusCount} clé(s) · WebSocket \`processed\``,
     ].join('\n'),
+    {
+      footer: 'Notif Windows : clic = Discord · lien Axiom en haut du message',
+    },
   );
 
   return {
     embeds: [embed],
-    components: [
-      row(btn(CID.ALERTS_LIVE, 'Alertes live', '🔔')),
-      row(btn(CID.TRADING, 'Trading', '💹')),
-      row(btn(CID.TEST, 'Test alerte', '🧪'), btn(CID.REFRESH, 'Resync', '🔃')),
-      row(backHome()),
-    ],
+    components: uiClampRows(
+      uiRowsPair([
+        uiBtn(CID.ALERTS_LIVE, '🔔 Alertes live', ButtonStyle.Primary),
+        uiBtn(CID.TRADING, '💹 Trading Jupiter', ButtonStyle.Success),
+        uiBtn(CID.SNIPE, '🎯 Sniping', ButtonStyle.Success),
+        uiBtn(CID.TEST, '🧪 Test alerte', ButtonStyle.Secondary),
+        uiBtn(CID.REFRESH, '🔃 Resync', ButtonStyle.Secondary),
+        uiBtn(CID.IMPORT, '📥 Import backup', ButtonStyle.Secondary),
+      ]).concat([uiRow(btnHome())]),
+    ),
   };
 }
 
 export function walletAddModal() {
   return new ModalBuilder()
     .setCustomId(CID.MODAL_WL_ADD)
-    .setTitle('Ajouter un wallet')
+    .setTitle('➕ Ajouter un wallet')
     .addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
@@ -299,10 +334,10 @@ export function walletAddModal() {
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('group')
-          .setLabel('Groupe (nom exact, vide = défaut)')
+          .setLabel('Groupe (vide = défaut)')
           .setStyle(TextInputStyle.Short)
           .setRequired(false)
-          .setPlaceholder('ex. migration 99% — laisse vide pour le 1er groupe'),
+          .setPlaceholder('ex. migration 99%'),
       ),
     );
 }
@@ -310,12 +345,12 @@ export function walletAddModal() {
 export function groupAddModal() {
   return new ModalBuilder()
     .setCustomId(CID.MODAL_GR_ADD)
-    .setTitle('Créer un groupe')
+    .setTitle('✨ Créer un groupe')
     .addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('name')
-          .setLabel('Nom')
+          .setLabel('Nom du groupe')
           .setStyle(TextInputStyle.Short)
           .setRequired(true),
       ),
@@ -364,6 +399,8 @@ export function resolveScreen(customId) {
       return 'settings';
     case CID.TRADING:
       return 'trading';
+    case CID.SNIPE:
+      return 'sniping';
     case CID.ALERTS_LIVE:
       return 'alerts_live';
     default:

@@ -1,17 +1,17 @@
+import { ActionRowBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
+import { getAllWalletsFlat, alertsLiveSummary } from '../api/lib/wallet-store.mjs';
 import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  EmbedBuilder,
-} from 'discord.js';
-import {
-  getAllWalletsFlat,
-  alertsLiveSummary,
-} from '../api/lib/wallet-store.mjs';
+  UI_COLORS,
+  uiBtn,
+  uiRow,
+  uiRowsPair,
+  uiClampRows,
+  btnHome,
+  btnBack,
+} from './discord-components.mjs';
 
-const ALERTS_COLOR = 0x3b82f6;
-/** Max 8 wallets = 2 rangées de boutons + 1 nav (limite Discord : 5 rangées). */
-export const PAGE_SIZE = 8;
+/** 4 wallets = 2 rangées × 2 + 3 rangées nav = 5 max (Discord). */
+export const PAGE_SIZE = 4;
 
 export const ACID = {
   MENU: 'bt:alerts:live',
@@ -22,14 +22,6 @@ export const ACID = {
   BACK_SETTINGS: 'bt:settings',
   TOGGLE_PREFIX: 'bt:alerts:t:',
 };
-
-function abtn(id, label, style = ButtonStyle.Secondary) {
-  return new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
-}
-
-function arow(...buttons) {
-  return new ActionRowBuilder().addComponents(...buttons.slice(0, 5));
-}
 
 export function alertToggleId(addr) {
   return `${ACID.TOGGLE_PREFIX}${addr}`;
@@ -49,53 +41,53 @@ export function buildAlertsLivePanel(page = 0) {
 
   const lines = slice.length
     ? slice.map(w => {
-        const st = w.alertsOn ? '🟢 ON' : '⚪ OFF';
-        const grp = w.groupActive ? '' : ' _(groupe pause)_';
+        const st = w.alertsOn ? '🟢 ON' : '⚫ OFF';
+        const grp = w.groupActive ? '' : ' _(pause)_';
         return `${st} · **${w.label}** · ${w.groupEmoji} ${w.groupName}${grp}`;
       })
-    : ['_Aucun wallet — ajoute-en dans Wallets._'];
+    : ['_Aucun wallet — menu 💼 Wallets pour en ajouter._'];
 
   const embed = new EmbedBuilder()
-    .setColor(ALERTS_COLOR)
+    .setColor(UI_COLORS.alerts)
     .setTitle('🔔 Alertes live')
     .setDescription(
       [
-        `**${sum.on}** actif(s) · **${all.filter(w => w.alertsOn).length}** ON · **${all.length}** total`,
-        `Page **${p + 1} / ${totalPages}**`,
+        `**${sum.on}** actif(s) sur **${all.length}** wallet(s) · page **${p + 1}/${totalPages}**`,
         '',
-        '_Clique un bouton pour passer ON ou OFF._',
+        '_Chaque bouton bascule ON/OFF pour ce wallet._',
         '',
         lines.join('\n'),
       ].join('\n'),
     )
-    .setFooter({ text: 'Wallet ON + groupe actif = alertes Discord envoyées' });
+    .setFooter({ text: 'Wallet ON + groupe actif = alerte Discord envoyée' })
+    .setTimestamp();
 
-  const components = [];
+  const toggleBtns = slice.map(w =>
+    uiBtn(
+      alertToggleId(w.addr),
+      `${w.alertsOn ? '🟢' : '⚫'} ${w.label}`.slice(0, 80),
+      w.alertsOn ? ButtonStyle.Success : ButtonStyle.Secondary,
+    ),
+  );
 
-  for (let i = 0; i < slice.length; i += 5) {
-    const chunk = slice.slice(i, i + 5);
-    components.push(
-      arow(
-        ...chunk.map(w =>
-          abtn(
-            alertToggleId(w.addr),
-            `${w.alertsOn ? '🟢' : '⚫'} ${w.label}`.slice(0, 80),
-            w.alertsOn ? ButtonStyle.Success : ButtonStyle.Secondary,
-          ),
-        ),
+  const navRows = [];
+  if (totalPages > 1) {
+    navRows.push(
+      uiRow(
+        uiBtn(ACID.PREV, '⬅️ Page', ButtonStyle.Secondary),
+        uiBtn(ACID.NEXT, '➡️ Page', ButtonStyle.Secondary),
       ),
     );
   }
+  navRows.push(
+    uiRow(
+      uiBtn(ACID.ALL_ON, '✅ Tout ON', ButtonStyle.Success),
+      uiBtn(ACID.ALL_OFF, '⛔ Tout OFF', ButtonStyle.Danger),
+    ),
+    uiRow(btnBack(ACID.BACK_SETTINGS, '⚙️ Paramètres'), btnHome()),
+  );
 
-  const nav = [];
-  if (totalPages > 1) {
-    nav.push(abtn(ACID.PREV, '⬅️', ButtonStyle.Secondary));
-    nav.push(abtn(ACID.NEXT, '➡️', ButtonStyle.Secondary));
-  }
-  nav.push(abtn(ACID.ALL_ON, '✅ Tout ON', ButtonStyle.Success));
-  nav.push(abtn(ACID.ALL_OFF, '⛔ Tout OFF', ButtonStyle.Danger));
-  nav.push(abtn(ACID.BACK_SETTINGS, '⚙️ Paramètres'));
-  components.push(arow(...nav));
+  const components = uiClampRows([...uiRowsPair(toggleBtns, 2), ...navRows]);
 
-  return { embeds: [embed], components: components.slice(0, 5) };
+  return { embeds: [embed], components };
 }

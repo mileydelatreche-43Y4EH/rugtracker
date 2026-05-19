@@ -1,8 +1,6 @@
 import {
   ActionRowBuilder,
-  ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
   ModalBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
@@ -10,14 +8,18 @@ import {
   TextInputStyle,
 } from 'discord.js';
 import { getActiveWallets } from '../api/lib/wallet-store.mjs';
-import {
-  listSnipes,
-  getSnipeByAddr,
-  snipeSummaryLines,
-} from '../api/lib/snipe-settings.mjs';
+import { listSnipes, getSnipeByAddr, snipeSummaryLines } from '../api/lib/snipe-settings.mjs';
 import { formatSolLabel } from '../api/lib/trade-format.mjs';
-
-const SNIPE_COLOR = 0xf59e0b;
+import {
+  UI_COLORS,
+  uiBtn,
+  uiEmbed,
+  uiRow,
+  uiRowsPair,
+  uiClampRows,
+  btnHome,
+  navBackHome,
+} from './discord-components.mjs';
 
 export const SCID = {
   MENU: 'bt:snipe',
@@ -31,35 +33,26 @@ export const SCID = {
   MODAL_SELL_PCT: 'bt:modal:snipesellpct:',
 };
 
-function sbtn(id, label, style = ButtonStyle.Secondary) {
-  return new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
-}
-
-function srow(...buttons) {
-  return new ActionRowBuilder().addComponents(...buttons.slice(0, 5));
-}
-
-function snipeEmbed(title, description) {
-  return new EmbedBuilder().setColor(SNIPE_COLOR).setTitle(title).setDescription(description);
-}
-
 export async function buildSnipeMenu() {
   const lines = snipeSummaryLines();
-  const embed = snipeEmbed(
-    '🎯 Sniping wallet',
+  const count = listSnipes().length;
+  const embed = uiEmbed(
+    UI_COLORS.snipe,
+    '🎯 Sniping wallets',
     [
-      'Copie les achats **uniquement** des wallets que tu configures ici.',
-      'L’**auto-buy** ne s’applique qu’à ces cibles (plus dans les paramètres généraux).',
+      'Copie automatiquement les achats des wallets que tu ajoutes ici.',
       '',
-      '**Cibles snipe**',
-      lines.join('\n\n').slice(0, 3500),
+      `**${count}** cible(s) configurée(s)`,
+      '',
+      lines.join('\n\n').slice(0, 3200) || '_Aucune cible — ajoute un wallet surveillé._',
     ].join('\n'),
+    { footer: 'Trading Jupiter doit être ON · réglages par cible dans le menu déroulant' },
   );
 
-  const components = [
-    srow(sbtn(SCID.ADD, '➕ Ajouter wallet', ButtonStyle.Success)),
-    srow(sbtn(SCID.BACK_TRADE, '⬅️ Trading')),
-  ];
+  const components = uiClampRows([
+    uiRow(uiBtn(SCID.ADD, '➕ Ajouter cible', ButtonStyle.Success), uiBtn(SCID.BACK_TRADE, '💹 Trading', ButtonStyle.Secondary)),
+    uiRow(btnHome()),
+  ]);
 
   const snipes = listSnipes();
   if (snipes.length) {
@@ -67,12 +60,12 @@ export async function buildSnipeMenu() {
       new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId(SCID.SEL_CFG)
-          .setPlaceholder('Configurer un snipe…')
+          .setPlaceholder('⚙️ Configurer une cible…')
           .addOptions(
             snipes.slice(0, 25).map(s => {
               const ab = s.autoBuy;
               return new StringSelectMenuOptionBuilder()
-                .setLabel(`${ab.enabled ? '🟢' : '⚪'} ${s.label || s.watchAddr.slice(0, 8)}`.slice(0, 100))
+                .setLabel(`${ab.enabled ? '🟢' : '⚫'} ${s.label || s.watchAddr.slice(0, 8)}`.slice(0, 100))
                 .setDescription(
                   `${ab.enabled ? formatSolLabel(ab.solAmount) : 'off'} · ${s.watchAddr.slice(0, 20)}`,
                 )
@@ -83,7 +76,7 @@ export async function buildSnipeMenu() {
       new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId(SCID.SEL_RM)
-          .setPlaceholder('Retirer un snipe…')
+          .setPlaceholder('🗑️ Retirer une cible…')
           .addOptions(
             snipes.slice(0, 25).map(s =>
               new StringSelectMenuOptionBuilder()
@@ -103,20 +96,21 @@ export function buildSnipeAddSelect() {
   const sniped = new Set(listSnipes().map(s => s.watchAddr));
   const candidates = getActiveWallets().filter(w => !sniped.has(w.addr));
 
-  const embed = snipeEmbed(
-    '➕ Ajouter au sniping',
+  const embed = uiEmbed(
+    UI_COLORS.snipe,
+    '➕ Nouvelle cible snipe',
     candidates.length
-      ? 'Choisis un **wallet surveillé** à sniper :'
-      : '_Tous les wallets actifs sont déjà en sniping, ou aucun wallet surveillé._',
+      ? 'Choisis un wallet **déjà surveillé** dans tes groupes :'
+      : '_Tous tes wallets actifs sont déjà en snipe, ou aucun wallet surveillé._',
   );
 
-  const components = [srow(sbtn(SCID.MENU, '⬅️ Sniping'))];
+  const components = uiClampRows([navBackHome(SCID.MENU)]);
   if (candidates.length) {
     components.unshift(
       new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId(SCID.SEL_ADD)
-          .setPlaceholder('Wallet à sniper…')
+          .setPlaceholder('👛 Wallet à sniper…')
           .addOptions(
             candidates.slice(0, 25).map(w =>
               new StringSelectMenuOptionBuilder()
@@ -138,21 +132,16 @@ export function buildSnipeConfigPanel(watchAddr) {
     return buildSnipeMenu();
   }
   const ab = snipe.autoBuy;
-  const embed = snipeEmbed(
+  const embed = uiEmbed(
+    UI_COLORS.snipe,
     `🎯 ${w?.label || watchAddr.slice(0, 8)}`,
     [
-      `**Wallet surveillé**`,
-      `\`${watchAddr}\``,
+      `**Adresse** · \`${watchAddr}\``,
       w?.groupName ? `**Groupe** · ${w.groupEmoji} ${w.groupName}` : '',
       '',
-      `**Auto-buy** · ${ab.enabled ? '🟢 **ACTIVÉ**' : '⚪ désactivé'}`,
-      `**% achat copié** · **${ab.buyCopyPct}%** du montant SOL qu’il achète`,
-      `**Plafond SOL** · ${formatSolLabel(ab.solAmount)} max par achat`,
-      `**Auto-sell** · ${ab.autoSellEnabled ? '🟢 **ACTIVÉ**' : '⚪ désactivé'}`,
-      `**% vente copiée** · **${ab.sellCopyPct}%** de sa vente → même % sur ta position`,
-      `**Venues** · ${(ab.venues || []).join(', ')} · max **${ab.maxPerMint}** achat(s)/token`,
-      '',
-      '_Trading ON requis. Achat = % de son SOL (plafonné). Vente = quand il vend, tu vends le même % de ta position._',
+      `**Auto-buy** · ${ab.enabled ? '🟢 ON' : '⚫ OFF'} · **${ab.buyCopyPct}%** du SOL copié · plafond **${formatSolLabel(ab.solAmount)}**`,
+      `**Auto-sell** · ${ab.autoSellEnabled ? '🟢 ON' : '⚫ OFF'} · **${ab.sellCopyPct}%** de sa vente`,
+      `**Venues** · ${(ab.venues || []).join(', ')} · max **${ab.maxPerMint}** achat(s)/mint`,
     ]
       .filter(Boolean)
       .join('\n'),
@@ -165,16 +154,16 @@ export function buildSnipeConfigPanel(watchAddr) {
 
   return {
     embeds: [embed],
-    components: [
-      srow(sbtn(`bt:snipe:tog:${watchAddr}`, buyTogLabel, buyTogStyle)),
-      srow(
-        sbtn(`bt:snipe:buypct:${watchAddr}`, `📊 ${ab.buyCopyPct}%`),
-        sbtn(`bt:snipe:sol:${watchAddr}`, '💰 Plafond'),
-        sbtn(`bt:snipe:sellpct:${watchAddr}`, `📤 ${ab.sellCopyPct}%`),
-      ),
-      srow(sbtn(`bt:snipe:selltog:${watchAddr}`, sellTogLabel, sellTogStyle)),
-      srow(sbtn(SCID.MENU, '⬅️ Liste')),
-    ],
+    components: uiClampRows(
+      uiRowsPair([
+        uiBtn(`bt:snipe:tog:${watchAddr}`, buyTogLabel, buyTogStyle),
+        uiBtn(`bt:snipe:selltog:${watchAddr}`, sellTogLabel, sellTogStyle),
+        uiBtn(`bt:snipe:buypct:${watchAddr}`, `📊 Buy ${ab.buyCopyPct}%`, ButtonStyle.Secondary),
+        uiBtn(`bt:snipe:sol:${watchAddr}`, '💰 Plafond SOL', ButtonStyle.Secondary),
+        uiBtn(`bt:snipe:sellpct:${watchAddr}`, `📤 Sell ${ab.sellCopyPct}%`, ButtonStyle.Secondary),
+        uiBtn(SCID.MENU, '⬅️ Liste', ButtonStyle.Primary),
+      ]),
+    ),
   };
 }
 
