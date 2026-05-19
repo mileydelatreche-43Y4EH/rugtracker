@@ -10,6 +10,7 @@ import {
   PUMP,
   PUMP_SWAP,
 } from '../api/lib/solana.mjs';
+import { shouldSkipDuplicateGroupBuy } from '../api/lib/alert-dedupe.mjs';
 import { getActiveWallets, onStoreChange } from '../api/lib/wallet-store.mjs';
 
 export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWallets }) {
@@ -17,8 +18,6 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
 
   let rpcRound = 0;
   const seenSigs = new Set();
-  const seenMintAt = new Map();
-  const mintDedupeTtl = Number(process.env.WALLET_MINT_DEDUPE_MS || 45_000);
   const wsBoxes = [];
   let walletIndexByAddr = new Map();
   let wallets = [];
@@ -47,10 +46,6 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
 
   function sleep(ms) {
     return new Promise(r => setTimeout(r, ms));
-  }
-
-  function mintDedupeKey(w, mint) {
-    return `${w.addr}:${mint}`;
   }
 
   function sigKey(w, sig) {
@@ -96,17 +91,7 @@ export function createBundleWorker({ heliusKeys, onBuy, getWallets = getActiveWa
   }
 
   async function emitBuy(w, hit, sig, wi, detectedAt) {
-    const dedupe = mintDedupeKey(w, hit.mint);
-    const now = Date.now();
-    const last = seenMintAt.get(dedupe);
-    if (last && now - last < mintDedupeTtl) return;
-    seenMintAt.set(dedupe, now);
-    if (seenMintAt.size > 4000) {
-      const cutoff = now - mintDedupeTtl;
-      for (const [k, t] of seenMintAt) {
-        if (t < cutoff) seenMintAt.delete(k);
-      }
-    }
+    if (shouldSkipDuplicateGroupBuy(w, hit.mint)) return;
     const ms = detectedAt ? Date.now() - detectedAt : 0;
     console.log(
       `🛒 achat ${w.label} · ${hit.mint.slice(0, 8)}… · ${hit.venue || 'curve'}` +
