@@ -1,0 +1,8 @@
+# Fichiers exclus de railway up (si tu réutilises upload un jour)
+index.html
+assets/
+deploy/
+.github/
+.cursor/
+*.md
+.git

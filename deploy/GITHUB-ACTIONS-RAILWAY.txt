@@ -26,6 +26,16 @@ GitHub :
 Push :
    git add -A && git commit -m "ci: fix railway project token" && git push origin main
 
+IMPORTANT — brancher GitHub sur Railway (sinon redeploy = ancien code) :
+   Service rugtracker → Settings → Source → Connect GitHub
+   Repo : mileydelatreche-43Y4EH/rugtracker · branche main
+
+Le workflow utilise "railway redeploy" (pas railway up) car upload = timeout.
+
+IDs utiles (depuis tes logs) :
+   Service ID : 94e5fd30-60f9-4b22-8b43-46d5b931ad0a
+   Project ID : 8b8f1a76-e839-4560-9f3bd70c352bf
+
 Vérifier :
    GitHub → Actions → Deploy Railway → vert
-   Railway → Deployments → nouveau build
+   Railway → Deployments → nouveau build (commit GitHub visible)
