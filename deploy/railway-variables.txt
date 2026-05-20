@@ -30,6 +30,10 @@ ENABLE_POLL_FALLBACK=0
 # ── Notifs PC clic → Axiom (app ntfy, topic secret) ──
 # NTFY_TOPIC=ton_topic_secret_long
 
+# ── Copier CA en 1 clic (lien → page /copy auto-colle) ──
+# Railway remplit RAILWAY_PUBLIC_DOMAIN si tu as un domaine public sur le service
+# Sinon : COPY_CA_PUBLIC_URL=https://ton-service.up.railway.app
+
 # ── Optionnel panneau ──
 # PANEL_MESSAGE_ID=
 

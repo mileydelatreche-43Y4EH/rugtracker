@@ -12,6 +12,8 @@ import {
 } from '../api/lib/discord-alert.mjs';
 import { fetchTokenMetaFast } from '../api/lib/token-meta.mjs';
 import { axiomTradeUrl } from '../api/lib/axiom.mjs';
+import { startCopyCaServer } from '../api/lib/copy-ca-server.mjs';
+import { getCopyCaPublicBase } from '../api/lib/copy-ca-url.mjs';
 import { silentMessage } from '../api/lib/discord-silent.mjs';
 import { notifyBuyAlert } from '../api/lib/notify-buy.mjs';
 import {
@@ -323,9 +325,12 @@ async function handleInteraction(interaction) {
 
   if (interaction.isButton() && interaction.customId?.startsWith(COPY_CA_PREFIX)) {
     const mint = interaction.customId.slice(COPY_CA_PREFIX.length);
+    const base = getCopyCaPublicBase();
     await replyEphemeralBrief(
       interaction,
-      `**Contrat (CA)**\n\`\`\`\n${mint}\n\`\`\``,
+      base
+        ? `Ouvre **Copier CA** (lien) pour coller auto.\nOu : \`${mint}\``
+        : `Configure **COPY_CA_PUBLIC_URL** ou un domaine Railway public.\n\`${mint}\``,
     );
     return;
   }
@@ -455,8 +460,13 @@ client.on('interactionCreate', interaction => {
   void handleInteraction(interaction);
 });
 
+startCopyCaServer();
+
 console.log(`Bundle Tracker · ${HELIUS_KEYS.length} clé(s) Helius · salon ${CHANNEL_ID}`);
 console.log('🔌 Intents Discord : Guilds uniquement (import via /import)');
 console.log('📦 Build cloud-redis — cherche ☁ REDIS_URL dans les logs ci-dessous');
+const copyBase = getCopyCaPublicBase();
+if (copyBase) console.log(`📋 Copier CA 1 clic · ${copyBase}/copy?m=…`);
+else console.warn('📋 Copier CA : active un domaine public Railway (ou COPY_CA_PUBLIC_URL)');
 
 await client.login(TOKEN);

@@ -7,6 +7,7 @@ import {
 import { buildBuyAlertText, fmtTokenSym, fmtWalletGroup, fmtMcShort } from './alert-format.mjs';
 import { pairButtonRows } from './discord-button-rows.mjs';
 import { rememberAlertContext } from './alert-context.mjs';
+import { copyCaLinkUrl } from './copy-ca-url.mjs';
 import { silentMessage } from './discord-silent.mjs';
 
 export const COPY_CA_PREFIX = 'bt:ca:';
@@ -84,14 +85,21 @@ export function clampAlertComponents(rows) {
   }).filter(r => r.components.length > 0);
 }
 
+function copyCaButton(mint) {
+  const m = String(mint || '').trim();
+  const url = copyCaLinkUrl(m);
+  if (url) return linkBtn('📋 Copier CA', url);
+  return new ButtonBuilder()
+    .setCustomId(`${COPY_CA_PREFIX}${m}`)
+    .setLabel('📋 Copier CA')
+    .setStyle(ButtonStyle.Secondary);
+}
+
 export function buildBuyButtons(links, mint) {
   const m = String(mint || '').trim();
   const core = [
     linkBtn('⚡ Axiom', links.axiom),
-    new ButtonBuilder()
-      .setCustomId(`${COPY_CA_PREFIX}${m}`)
-      .setLabel('📋 Copier CA')
-      .setStyle(ButtonStyle.Secondary),
+    copyCaButton(m),
     new ButtonBuilder()
       .setCustomId(ALERT_BOT_HOME)
       .setLabel('🏠 Menu bot')
@@ -110,10 +118,7 @@ export function buildAlertMenuComponents(links, mint) {
     linkBtn('🔍 Solscan', links.solscan),
     linkBtn('🦅 Birdeye', links.birdeye),
     linkBtn('📈 Dex', links.dex),
-    new ButtonBuilder()
-      .setCustomId(`${COPY_CA_PREFIX}${m}`)
-      .setLabel('📋 Copier CA')
-      .setStyle(ButtonStyle.Secondary),
+    copyCaButton(m),
   ]);
 }
 
