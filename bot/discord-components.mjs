@@ -73,7 +73,7 @@ export function uiEmbed(color, title, body, opts = {}) {
 }
 
 export function btnHome() {
-  return uiBtn('bt:home', L(ICO.home, 'Accueil'), ButtonStyle.Primary);
+  return uiBtn('bt:home', L(ICO.home, 'Menu'), ButtonStyle.Primary);
 }
 
 export function btnBack(id, text = 'Retour') {

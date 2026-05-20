@@ -111,9 +111,11 @@ export function buildWalletsMenu() {
         uiBtn(CID.GR_PAUSE, L(ICO.pause, 'Pause'), ButtonStyle.Secondary),
         uiBtn(CID.GR_RESUME, L(ICO.resume, 'Reprendre'), ButtonStyle.Secondary),
         uiBtn(CID.IMPORT, L(ICO.import, 'Import .json'), ButtonStyle.Secondary),
-        uiBtn(CID.EXPORT, L(ICO.export, 'Export .json'), ButtonStyle.Secondary),
       ]),
-      uiRow(btnHome()),
+      uiRow(
+        uiBtn(CID.EXPORT, L(ICO.export, 'Export .json'), ButtonStyle.Secondary),
+        uiBtn(CID.HOME, L(ICO.home, 'Menu'), ButtonStyle.Primary),
+      ),
     ]),
   };
 }
