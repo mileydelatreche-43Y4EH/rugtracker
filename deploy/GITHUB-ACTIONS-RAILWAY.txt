@@ -1,0 +1,34 @@
+Déploiement Railway via GitHub Actions (si redeploy auto ne marche pas)
+================================================================================
+
+1) Token Railway
+   - railway.com → avatar → Account Settings → Tokens → Create
+   - Copie le token (une seule fois visible)
+
+2) Service ID — OPTIONNEL (tu peux sauter cette étape)
+   Le workflow utilise par défaut le projet "reasonable-healing" et le service "rugtracker".
+   Si tu veux le trouver quand même :
+   - Ouvre le service rugtracker sur Railway
+   - Settings (engrenage) → tout en haut ou section General
+   - Ou regarde l’URL du navigateur :
+     railway.com/project/XXXX/service/ICI-C-EST-L-SERVICE-ID
+   - Ou en terminal (après railway link) : railway status
+
+3) Secrets GitHub (repo rugtracker) — un seul secret suffit
+   - github.com → ton repo → Settings → Secrets and variables → Actions
+   - New repository secret : RAILWAY_TOKEN = (token étape 1)
+   - (optionnel) RAILWAY_SERVICE_ID = seulement si tu l’as trouvé
+
+4) Push le code
+   git add -A
+   git commit -m "ci: deploy railway via github actions"
+   git push origin main
+
+5) Vérifier
+   - GitHub → onglet Actions → workflow "Deploy Railway" → doit être vert
+   - Railway → Deployments → nouveau build après le workflow
+
+Lancer le bot en local (sans Railway) :
+   cd bundle-tracker
+   (remplis .env comme sur Railway)
+   node bot/discord-bot.mjs

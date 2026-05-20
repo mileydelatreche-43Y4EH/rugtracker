@@ -1,0 +1,39 @@
+# Déploie sur Railway à chaque push sur main (contourne l’auto-deploy Railway cassé).
+# Secrets GitHub requis : RAILWAY_TOKEN (+ RAILWAY_SERVICE_ID recommandé)
+name: Deploy Railway
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli@latest
+
+      - name: Deploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          RAILWAY_PROJECT: reasonable-healing
+          RAILWAY_SERVICE: rugtracker
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::Secret GitHub obligatoire : RAILWAY_TOKEN (railway.com → Account → Tokens)"
+            exit 1
+          fi
+          if [ -n "$RAILWAY_SERVICE_ID" ]; then
+            railway up --service "$RAILWAY_SERVICE_ID" --detach
+          else
+            railway link --project "$RAILWAY_PROJECT" --environment production --service "$RAILWAY_SERVICE"
+            railway up --detach
+          fi
