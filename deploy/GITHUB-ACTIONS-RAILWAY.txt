@@ -1,18 +1,18 @@
 GitHub Actions → Railway (token PROJET obligatoire)
 ==================================================
 
-ERREUR "Invalid RAILWAY_TOKEN" = mauvais type de token.
+ERREUR "Invalid" ou "Unauthorized" = mauvais token ou mauvais endroit.
 
-❌ NE PAS utiliser :
-   Avatar → Account Settings → Tokens
-   (token compte / workspace — ne marche pas avec railway up en CI)
+❌ NE PAS utiliser : Avatar → Account Settings → Tokens
 
-✅ UTILISER un token de PROJET :
-   1. railway.com → projet "reasonable-healing" (clique le nom du projet en haut)
-   2. Onglet Settings du PROJET (pas seulement le service rugtracker)
-   3. Section "Tokens" ou "Project Tokens"
-   4. Create Token → environnement "production"
-   5. Copie le token (format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+✅ Token PROJET (à recréer si doute) :
+   1. Projet reasonable-healing → Settings → Tokens
+   2. Supprime l'ancien token si tu peux
+   3. Create Token → environnement "production" (même env que rugtracker)
+   4. Copie tout de suite dans GitHub (les anciens tokens ne marchent plus après regen)
+
+Note : "railway whoami" échoue souvent avec un token projet — c'est normal.
+Le workflow n'utilise plus whoami.
 
    Si tu ne vois pas Tokens :
    - Service rugtracker → Settings → cherche "Project Token" / "Generate Token"

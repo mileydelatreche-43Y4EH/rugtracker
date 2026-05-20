@@ -1,6 +1,6 @@
-# Déclenche un rebuild Railway sans upload (évite le timeout backboard).
-# Prérequis : repo GitHub branché sur le service rugtracker (Settings → Source).
-# Secret : RAILWAY_TOKEN = token PROJET (projet reasonable-healing → Settings → Tokens)
+# Rebuild Railway depuis GitHub (sans railway up = pas de timeout upload).
+# Secret RAILWAY_TOKEN = token PROJET (projet → Settings → Tokens → production)
+# Prérequis : rugtracker → Settings → Source → repo GitHub branché sur main
 name: Deploy Railway
 
 on:
@@ -15,19 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Vérifier le token
+      - name: Deploy from GitHub source
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           if [ -z "$RAILWAY_TOKEN" ]; then
-            echo "::error::Secret RAILWAY_TOKEN manquant (token PROJET Railway)"
+            echo "::error::Ajoute RAILWAY_TOKEN (token PROJET Railway, pas token compte)"
             exit 1
           fi
-          railway whoami
-
-      - name: Redeploy service rugtracker
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: |
-          echo "Build depuis GitHub (pas d'upload CLI)…"
           railway redeploy --service rugtracker --yes --from-source
