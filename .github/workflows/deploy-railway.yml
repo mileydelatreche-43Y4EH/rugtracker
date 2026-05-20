@@ -28,4 +28,4 @@ jobs:
       - name: Deploy
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --ci --detach
+        run: railway up --ci --detach --service rugtracker
